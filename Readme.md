@@ -234,7 +234,7 @@ The following table describes all form fields and buttons in the manager interfa
 | Field Name | Description | 
 | --- | --- |
 | Attack Host Domain | This is the (sub-)domain where the Singularity web server is running. Default value: `dynamic.rebind.it` |
-| Attack Host | This is the IP address where the manager and the attack payloads are hosted. Default value: 80.85.86.45 |
+| Attack Host | This is the IP address where the manager and the attack payloads are hosted. Default value: xxx.xxx.xxx.xxx |
 | Target Host | This is the IP address of the target system where the victim (target) application is running. Default value: 127.0.0.1 |
 | Target Port | This is the port where the victim (target) application is listening on. Default value: 8080 |
 | Request New Port | This will request Singularity to listen on a new port. This feature is only available when Singularity has been started with the `-dangerouslyAllowDynamicHTTPServers` command line option. |
