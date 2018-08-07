@@ -13,7 +13,7 @@
 - [Test](#test)
 - [Browser Support](#browser-support)
 - [Using Singularity](#using-singularity)
-- [DNS Rebinding Attack and Mitigations](#dns-rebinding-attack-and-mitigations)
+- [Preventing DNS Rebinding Attacks](#preventing-dns-rebinding-attacks)
 - [Advanced Techniques](#advanced-techniques)
 - [Useful Notes and Other Loose Ends](#useful-notes-and-other-loose-ends)
 - [Contributing](#contributing)
@@ -22,9 +22,24 @@
 
 <!-- /TOC -->
 
-## Introduction
+## Introducing Singularity
 
-`Singularity of Origin` is a tool to perform [DNS rebinding](https://en.wikipedia.org/wiki/DNS_rebinding) attacks. It includes the necessary components to rebind the IP address of the attack server DNS name to the target machine's IP address and to serve attack payloads to exploit vulnerable software on the target machine. It also ships with sample payloads to exploit several vulnerable software versions, from the simple capture of a home page to performing remote code execution. It aims at providing a framework to facilitate the exploitation of software vulnerable to DNS rebinding attacks and to raise awareness on how they work and how to protect from them.
+`Singularity of Origin` is a tool to perform [DNS rebinding](https://en.wikipedia.org/wiki/DNS_rebinding) attacks. It includes the necessary components to rebind the IP address of the attack server DNS name to the target machine's IP address and to serve attack payloads to exploit vulnerable software on the target machine. 
+
+It also ships with sample payloads to exploit several vulnerable software versions, from the simple capture of a home page to performing remote code execution. It aims at providing a framework to facilitate the exploitation of software vulnerable to DNS rebinding attacks and to raise awareness on how they work and how to protect from them.
+
+### How Do DNS Rebinding Attacks Work?
+DNS rebinding changes the IP address of an attacker controlled machine name to the IP address of a target application, bypassing the [same-origin policy](https://developer.mozilla.org/en-US/docs/Web/Security/Same-origin_policy) and thus allowing the browser to make arbitrary requests to the target application and read their responses. 
+The Singularity DNS server is responding with short time to live (TTL) records,
+minimizing the time the response is cached.
+When the victim browses to the Singularity manager interface, the Singularity's
+DNS server first responds with the IP address of Singularity itself where the
+client-side code (payload) is hosted.
+When the DNS record times out, the Singularity DNS server responds with the IP
+address of the target host (e.g. 127.0.0.1) and the victim's browser can access
+the target application, circumventing the browser's same-origin policy.
+
+
 
 ## Features
 
@@ -39,6 +54,8 @@
   * Aggressive DNS response TTLs
   * Option to use DNS CNAME instead of A records to evade several DNS filtering solutions
 * Ability to allocate HTTP servers at startup or dynamically thereafter
+  * A convenience feature to avoid restarting Singularity to listen on a different HTTP port.
+  * To lay the ground work to attack vulnerable ports discovered after a scan.
 
 ## Screenshots
 
@@ -55,16 +72,16 @@
 
 ## Setup
 
-Let's say that we want to retrieve the homepage of a tool listening on the localhost, port 8080, of a victim desktop machine from domain "*dynamic.your.domain.*". You personally own/manage domain "*your.domain.*". You will mount attacks from a server with IP address "*ip.ad.dr.ss*". This server will run the Singularity DNS and HTTP servers.
+Let's say that we want to retrieve the homepage of a tool listening on `localhost`, port 8080, of a victim desktop machine from domain "*dynamic.your.domain.*" You personally own/manage domain "*your.domain.*" You will mount attacks from a server with IP address "*ip.ad.dr.ss*". This server will run the Singularity DNS and HTTP servers.
 
 ### On the DNS Registrar Web Management Interface
 
-Configure appropriate DNS records to delegate the management of a test subdomain ("*dynamic.your.domain.*") of a domain you own ("*your.domain.*") to the Singularity's DNS server that we will deploy shortly:
+Configure appropriate DNS records to delegate the management of a test subdomain ("*dynamic.your.domain*") of a domain you own ("*your.domain*") to the Singularity's DNS server that we will deploy shortly:
 
 * **A Name**: "rebinder", **IPv4**: "*ip.ad.dr.ss*"
-* **NS Name**: "dynamic", **Hostname**: "*rebinder.your.domain.*"
+* **NS Name**: "dynamic", **Hostname**: "*rebinder.your.domain*"
 
-This sample setup informs DNS clients including browsers that "*ip.ad.dr.ss*" answers queries for any subdomains under "*.dynamic.your.domain.*" e.g. "foo.dynamic.your.domain". This also permits to access the Singularity management console using the "*rebinder.your.domain*" DNS name with a web browser.
+This sample setup informs DNS clients, including browsers, that "*ip.ad.dr.ss*" answers queries for any subdomains under "*.dynamic.your.domain*", e.g. "foo.dynamic.your.domain". This also permits one to access the Singularity management console using the "*rebinder.your.domain*" DNS name with a web browser.
 
 
 ### On the Attacker Host
@@ -81,20 +98,20 @@ Open a terminal and type the following command:
 #### Compile 
 
 ```bash
-cd ~/go/src/github.com/nccgroup/singularity/cmd/singularity-server
-go build
+$ cd ~/go/src/github.com/nccgroup/singularity/cmd/singularity-server
+$ go build
 ````
 
 #### Deploy
 
- * Deploy the "html" directory in let's say "~/singularity"
- * Deploy the `singularity-server` binary in "~/singularity"
+ * Deploy the "html" directory in let's say "~/singularity".
+ * Deploy the `singularity-server` binary in "~/singularity".
 
  ```bash
-cd ~/
-mkdir -p singularity/html
-cp ~/go/src/github.com/nccgroup/singularity/cmd/singularity-server ~/singularity/
-cp ~/go/src/github.com/nccgroup/singularity/html/* /singularity/html/*
+$ cd ~/
+$ mkdir -p singularity/html
+$ cp ~/go/src/github.com/nccgroup/singularity/cmd/singularity-server ~/singularity/
+$ cp ~/go/src/github.com/nccgroup/singularity/html/* /singularity/html/*
  ```
 
 #### Run
@@ -109,15 +126,15 @@ Note: You will need to verify that other services do not listen on ports require
 - The port where the vulnerable application is running (e.g. port 3000 for the
   Ruby on Rails Web Console or port 9333 for VS Code Chrome DevTools)
 
-On Ubuntu 18.04 LTS, by default systemd-resolved is listening on the localhost UDP port 53. This will prevent Singularity from starting.
-Disable systemd-resolved with this command: `sudo systemctl disable --now systemd-resolved.service`
+On Ubuntu 18.04 LTS, by default, `systemd-resolved` is listening on the localhost UDP port 53. This will prevent Singularity from starting.
+Disable `systemd-resolved` with this command: `sudo systemctl disable --now systemd-resolved.service`.
 Next, update the file `/etc/resolv.conf` to make sure it does not contain `nameserver 127.0.0.53` but something like `nameserver 8.8.8.8`.
 Replace `8.8.8.8` with the IP address of the DNS server of your choosing (e.g. nameserver 169.254.169.254 on [GCP](https://cloud.google.com/compute/docs/internal-dns)).
 
 
 #### Firewalls
-Singularity requires multiple ports exposed to the internet (or at least to the
-network from which you access the tool via browser).
+Singularity requires multiple ports exposed to the Internet (or at least to the
+network from which you access the tool via your browser).
 The minimum required ports are UDP 53 for DNS and the port where the
 Singularity manager web interface is running.
 The default port for the manager web interface is TCP port 8080.
@@ -136,7 +153,7 @@ Please check with your hosting provider to configure allowed inbound ports:
 
 ### On the Victim Host
  * Deploy a local test service with `python -c 'import BaseHTTPServer as bhs, SimpleHTTPServer as shs; bhs.HTTPServer(("127.0.0.1", 8080), shs.SimpleHTTPRequestHandler).serve_forever()'` from a directory containing some test data files, on your client machine.
- * Browse to "http://rebinder.your.domain:8080/manager.html"
+ * Browse to "http://rebinder.your.domain:8080/manager.html".
  * Ensure that the following fields contain the correct information: 
    * "Attack Host Domain" e.g. "*dynamic.your.domain*"
    * "Attack Host" e.g. "*ip.ad.dr.ss*"
@@ -166,19 +183,19 @@ Singularity has been tested to work in the following browsers:
 Microsoft Internet Explorer is currently not supported. Attacks via Microsoft Edge are possible but take a long time.
 
 ## Using Singularity
-When Singularity is run without arguments, the manager web interface is
-listening on TCP port 8080.
+When Singularity is run without arguments, the manager web interface
+listens on TCP port 8080.
 Browse to that port to configure and launch the DNS rebinding attack.
 
 ### Personalizing The Manager Configuration File
 Singularity comes with a default configuration file in `html/manager-config.json`.
-You can modify this file to change the default parameters such as the
+You can modify this file to change the default parameters, such as the
 `attackHostDomain`, the `attackHostIPAddress`, and the `attackPayloads`.
 You need to edit this file if you add your own payloads.
 You do not need to edit the configuration file if you want to use existing
 payloads as you can change the parameters in the web interface.
 
-### Servers Arguments
+### Server Arguments
 Launch the Singularity binary, (`singularity-server`), with the `-h` parameter to see its parameters.
 
 - `-DNSRebindStrategy string` : 
@@ -193,19 +210,19 @@ Launch the Singularity binary, (`singularity-server`), with the `-h` parameter t
 - `-ResponseIPAddr string` : 
   Specify the attacker host IP address that will be rebound to the victim host 
   address using strategy specified by flag `-DNSRebingStrategy` (default value
-  is 192.168.0.1)
+  is 192.168.0.1).
 - `-ResponseReboundIPAddr string` : 
   Specify the victim host IP address that is rebound from the attacker host
-  address (default value is 127.0.0.1)
+  address (default value is 127.0.0.1).
 - `-dangerousAllowDynamicHTTPServers`
   Specify if any target can dynamically request Singularity to allocate an HTTP
   Server on a new port.
-  This feature may be *dangerous* as it allows to open new ports via the
+  This feature may be *dangerous* as it allows opening new ports via the
   unauthenticated web interface.
 - `-responseReboundIPAddrtimeOut int` : 
   Specify a delay in seconds for which we will keep responding with Rebound IP
   Address after the last query.
-  After delay, we will respond with ResponseReboundIPAddr.
+  After the delay, we will respond with `ResponseReboundIPAddr`.
   The default is 300 seconds.
 
 ### Manager UI
@@ -216,87 +233,87 @@ The following table describes all form fields and buttons in the manager interfa
 
 | Field Name | Description | 
 | --- | --- |
-| Attack Host Domain | This is the (sub-)domain where the Singularity web server is running. Default value: dynamic.rebind.it |
+| Attack Host Domain | This is the (sub-)domain where the Singularity web server is running. Default value: `dynamic.rebind.it` |
 | Attack Host | This is the IP address where the manager and the attack payloads are hosted. Default value: 80.85.86.45 |
 | Target Host | This is the IP address of the target system where the victim (target) application is running. Default value: 127.0.0.1 |
 | Target Port | This is the port where the victim (target) application is listening on. Default value: 8080 |
 | Request New Port | This will request Singularity to listen on a new port. This feature is only available when Singularity has been started with the `-dangerouslyAllowDynamicHTTPServers` command line option. |
 | Attack Payload | This is where you select the payload, i.e. which application you are trying to exploit. |
-| Start Attack | Start the DNS rebinding attack. Be patient and wait for at least one minute. Open the browser web console to debugging logs. |
+| Start Attack | Start the DNS rebinding attack. Be patient and wait for at least one minute. Open the browser web console to see debugging logs. |
 | Toggle Advanced Options | This button will enable the advanced fields described below. |
 | Interval | How long to wait between connection attempts to the target application in seconds. Default value: 20 |
-| Index Token | The index token is used by Singularity to detect if the rebinding has happened yet. Default value: thisismytesttoken |
+| Index Token | The index token is used by Singularity to detect if the rebinding has happened yet. Default value: `thisismytesttoken` |
 
 ### Payloads Description
 Singularity supports the following attack payloads:
 
-* **Basic fetch request** (payload-simple-fetch-get.html): This sample payload
+* **Basic fetch request** (`payload-simple-fetch-get.html`): This sample payload
   makes a GET request to the root directory ('/') and shows the server response
-  using the fetch API.
+  using the `fetch` API.
   The goal of this payload is to function as example request to make additional
   contributions as easy as possible.
-* **Basic XHR request** (payload-simple-xhr-get.html): Another sample payload to
+* **Basic XHR request** (`payload-simple-xhr-get.html`): Another sample payload to
   make a GET request to the root directory ('/') and showing the server response
-  using  XMLHttpRequest (XHR).
-* **Chrome DevTools** (payload-exposed-chrome-devtools.html): This payload
+  using `XMLHttpRequest` (XHR).
+* **Chrome DevTools** (`payload-exposed-chrome-devtools.html`): This payload
   demonstrates a remote code execution (RCE) vulnerability in Microsoft VS Code fixed in version 1.19.3.
-  This payload can be adapted to exploit any software that exposes Chrome dev tools on localhost.
-* **etcd** (payload-etcd.html): This payload retrieves the keys and values from
+  This payload can be adapted to exploit any software that exposes Chrome Dev Tools on `localhost`.
+* **etcd** (`payload-etcd.html`): This payload retrieves the keys and values from
   the [etcd](https://github.com/coreos/etcd) key-value store.
-* **pyethapp** (payload-pyethapp.html): Exploit the Python implementation of the 
+* **pyethapp** (`payload-pyethapp.html`): Exploit the Python implementation of the 
   Ethereum client [Pyethapp](https://github.com/ethereum/pyethapp) to get the
   list of owned eth addresses and retrieve the balance of the first eth address.
-* **Rails Web Console** (payload-rails-webconsole.html): Performs a remote code
-  execution (RCE) attack of the [Rails Web Console](https://github.com/rails/web-console).
+* **Rails Web Console** (`payload-rails-webconsole.html`): Performs a remote code
+  execution (RCE) attack on the [Rails Web Console](https://github.com/rails/web-console).
 
 
 ### Creating Your Own Payloads
 
 Creating your own payloads is as simple as copying the sample payload HTML file
-(payload-simple-fetch-get.html) and modify it according to your needs.
+(`payload-simple-fetch-get.html`) and modify it according to your needs.
 The sample payload makes a single GET request and displays the response.
-Start with copying the content of this file to a new .html file and add its name
-to the `attackPayloads` list in the manager-config.json file.
+Start with copying the content of this file to a new `.html` file and add its name
+to the `attackPayloads` list in the `manager-config.json` file.
 Then modify the new HTML file to change the request URL for example.
 
+## Preventing DNS Rebinding Attacks
 
-## DNS Rebinding Attack and Mitigations
+DNS rebinding attacks can be prevented by validating the "Host" HTTP header on
+the server-side to only allow a set of whitelisted values.  For services
+listening on the loopback interface, this set of whitelisted host values should
+only contain localhost and all reserved numeric addresses for the loopback
+interface, including 127.0.0.1.
 
-### How Does the Attack Work?
-DNS rebinding changes the IP address of an attacker controlled machine name to the IP address of a target application, bypassing the [same-origin policy](https://developer.mozilla.org/en-US/docs/Web/Security/Same-origin_policy) and thus allowing the browser to make arbitrary requests to the target application and read their responses. 
-The Singularity DNS server is responding with short time to live (TTL) records,
-minimizing the time the response is cached.
-When the victim browses to the Singularity manager interface, the Singularity's
-DNS server first responds with the IP address of Singularity itself where the
-client-side code (payload) is hosted.
-When the DNS record times out, the Singularity DNS server responds with the IP
-address of the target host (e.g. 127.0.0.1) and the victim's browser can access
-the target application, circumventing the browser's same-origin policy.
+For instance, let's say that a service is listening on address 127.0.0.1, TCP
+port 3000. Then, the service should check that all HTTP request "Host" header
+values strictly contain "127.0.0.1:3000" and/or "localhost:3000". If the host
+header contains anything else, then the request should be denied.
 
-### How to Protect from it?
-The following techniques can prevent DNS rebinding attacks:
+Depending on the application deployment model, you may have to whitelist other or
+additional addresses such as 127.0.0.2, another reserved numeric address for the
+loopback interface.
 
-- DNS rebinding attacks can be prevented by validating the Host HTTP header on
-  the server-side to only allow a set of whitelisted values.
-  This set of whitelisted host values should only contain localhost and all 
-  reserved numeric addresses for the loopback interface including 127.0.0.1 by default.
+For services exposed on the network (and for any services in general),
+authentication should be required to prevent unauthorized access.
 
-- Require authentication for the target application to prevent unauthorized
-  access.
-
+Filtering DNS responses containing private, link-local or loopback addresses,
+both for IPv4 and IPv6, should not be relied upon as a primary defense mechanism
+against DNS rebinding attacks. Singularity can bypass some filters in certain
+conditions, such as responding with a localhost CNAME record when targeting an
+application via the Google Chrome browser for instance.
 
 ## Advanced Techniques
 * Use the `-DNSRebindStrategy DNSRebindFromQueryRandom` DNS rebinding strategy instead of the default `- DNSRebindStrategy DNSRebindFromQueryFirstThenSecond` if you suspect the presence of an IDS in one or more environments that sends several DNS requests to the attack server in addition to the actual target. This will ensure that the target will eventually obtain the required IP address, albeit a bit more slowly.
-* Singularity responds with a DNS CNAME instead of a A record if specifying "localhost" in target instead of "127.0.0.1". This may work around DNS filtering of responses containing "127.0.0.1", at least on Chrome and Firefox. Chrome & Firefox appear to look at their internal database upon reception of the CNAME record containing "localhost" instead of making another DNS lookup. Chrome populates its DNS cache with both "127.0.0.1" and "::1" in particular. Related: https://tools.ietf.org/html/draft-west-let-localhost-be-localhost-06.
+* Singularity responds with a DNS CNAME instead of an A record if one specifies "localhost" as the target instead of "127.0.0.1". This may work around DNS filtering of responses containing "127.0.0.1", at least on Chrome and Firefox. Chrome & Firefox appear to look at their internal database upon reception of the CNAME record containing "localhost" instead of making another DNS lookup. Chrome populates its DNS cache with both "127.0.0.1" and "::1" in particular. Related: https://tools.ietf.org/html/draft-west-let-localhost-be-localhost-06.
 * Similarly, specifying "0.0.0.0" on Mac and Linux, which corresponds to "this host, on any interface" on these platforms may work around some filters/controls.
 
 ## Useful Notes and Other Loose Ends
- * Cross-platform compilation: go to "~/singularity/cmd/singularity-server/" and type `env GOOS=linux GOARCH=amd64 go build` for linux build or `go build` from a macos machine for a mac build.
+ * Cross-platform compilation: go to "~/singularity/cmd/singularity-server/" and type `env GOOS=linux GOARCH=amd64 go build` for a Linux build or `go build` from a mac OS machine for a Mac build.
  * The `fetch` API based attack scripts in the "html" directories will stop after 5 attempts if there are network errors.
- * chrome://net-internals/#dns is great for debugging.
+ * Going to `chrome://net-internals/#dns` in the Chrome browser is great for debugging.
  * Test `dig` query: `dig "s-ip.ad.dr.ss-127.0.0.1-<random_number>--e.dynamic.your.domain" @ip.ad.dr.ss`
- * `sudo ./singularity-server -HTTPServerPort 8080 -HTTPServerPort 8081  -dangerouslyAllowDynamicHTTPServers` starts server on port 8080 and 8081 and permit to request dynamically one additional HTTP port via the Manager interface.
- * Testing a service for DNS rebinding vulnerability: In an HTTP intercepting proxy such as Portswigger Burp Suite, replay a request to localhost replacing the host header value e.g. "localhost" with "attacker.com". If the request is accepted, chances are that you have found a DNS rebinding vulnerability. What you can do after, the impact, depends on the vulnerable application.
+ * `sudo ./singularity-server -HTTPServerPort 8080 -HTTPServerPort 8081  -dangerouslyAllowDynamicHTTPServers` starts a server on port 8080 and 8081 and enables requesting dynamically one additional HTTP port via the Manager interface.
+ * Testing a service for a DNS rebinding vulnerability: In an HTTP intercepting proxy such as Portswigger's Burp Suite, replay a request to `localhost`, replacing the host header value e.g. "localhost" with "attacker.com". If the request is accepted, chances are that you have found a DNS rebinding vulnerability. What you can do after, the impact, depends on the vulnerable application.
 
 
 ## Contributing
