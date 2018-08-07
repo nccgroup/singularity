@@ -76,12 +76,12 @@ Let's say that we want to retrieve the homepage of a tool listening on `localhos
 
 ### On the DNS Registrar Web Management Interface
 
-Configure appropriate DNS records to delegate the management of a test subdomain ("*dynamic.your.domain*") of a domain you own ("*your.domain*") to the Singularity's DNS server that we will deploy shortly:
+Configure appropriate DNS records to delegate the management of a test subdomain ("*dynamic.your.domain.*") of a domain you own ("*your.domain.*") to the Singularity's DNS server that we will deploy shortly:
 
 * **A Name**: "rebinder", **IPv4**: "*ip.ad.dr.ss*"
-* **NS Name**: "dynamic", **Hostname**: "*rebinder.your.domain*"
+* **NS Name**: "dynamic", **Hostname**: "*rebinder.your.domain.*"
 
-This sample setup informs DNS clients, including browsers, that "*ip.ad.dr.ss*" answers queries for any subdomains under "*.dynamic.your.domain*", e.g. "foo.dynamic.your.domain". This also permits one to access the Singularity management console using the "*rebinder.your.domain*" DNS name with a web browser.
+This sample setup informs DNS clients, including browsers, that "*ip.ad.dr.ss*" answers queries for any subdomains under "*.dynamic.your.domain.*", e.g. "foo.dynamic.your.domain.". This also permits one to access the Singularity management console using the "*rebinder.your.domain*" DNS name with a web browser.
 
 
 ### On the Attacker Host
