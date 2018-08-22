@@ -24,8 +24,9 @@ import (
 // based on their current DNS rebinding state.
 // Must use RO or RW mutex to access.
 type DNSClientStateStore struct {
-	Sessions map[string]*DNSClientState
+	RebindingStrategy string
 	sync.RWMutex
+	Sessions map[string]*DNSClientState
 }
 
 // AppConfig stores running parameter of singularity server.
@@ -33,7 +34,8 @@ type AppConfig struct {
 	HTTPServerPorts              []int
 	ResponseIPAddr               string
 	ResponseReboundIPAddr        string
-	RebindingFn                  func(session string, dcss *DNSClientStateStore, q dns.Question) string
+	RebindingFn                  func(session string, dcss *DNSClientStateStore, q dns.Question) []string
+	RebindingFnName              string
 	ResponseReboundIPAddrtimeOut int
 	AllowDynamicHTTPServers      bool
 }
@@ -140,21 +142,20 @@ func NewDNSQuery(qname string) (*DNSQuery, error) {
 
 // dnsRebindFirst is a convenience function
 // that always returns the first host in DNS query
-func dnsRebindFirst(session string, dcss *DNSClientStateStore, q dns.Question) string {
-	var result string
+func dnsRebindFirst(session string, dcss *DNSClientStateStore, q dns.Question) []string {
 	dcss.RLock()
-	result = dcss.Sessions[session].ResponseIPAddr
+	answers := []string{dcss.Sessions[session].ResponseIPAddr}
 	dcss.RUnlock()
-	return result
+	return answers
 }
 
 // DNSRebindFromQueryFirstThenSecond is a response handler to DNS queries
 // It extracts the hosts in the DNS query string
 // It first returns the first host once in the DNS query string
 // then the second host in all subsequent queries for a period of time timeout.
-func DNSRebindFromQueryFirstThenSecond(session string, dcss *DNSClientStateStore, q dns.Question) string {
+func DNSRebindFromQueryFirstThenSecond(session string, dcss *DNSClientStateStore, q dns.Question) []string {
 	dcss.RLock()
-	host := dcss.Sessions[session].ResponseIPAddr
+	answers := []string{dcss.Sessions[session].ResponseIPAddr}
 	dnsCacheFlush := dcss.Sessions[session].DNSCacheFlush
 	elapsed := dcss.Sessions[session].CurrentQueryTime.Sub(dcss.Sessions[session].LastQueryTime)
 	timeOut := dcss.Sessions[session].ResponseReboundIPAddrtimeOut
@@ -163,19 +164,19 @@ func DNSRebindFromQueryFirstThenSecond(session string, dcss *DNSClientStateStore
 
 	if dnsCacheFlush == false { // This is not a request for cache eviction
 		if elapsed < (time.Second * time.Duration(timeOut)) {
-			host = dcss.Sessions[session].ResponseReboundIPAddr
+			answers = append(answers, dcss.Sessions[session].ResponseReboundIPAddr)
 		}
 	}
 	dcss.RUnlock()
-	return host
+	return answers
 }
 
 // DNSRebindFromQueryRandom is a response handler to DNS queries
 // It extracts the two hosts in the DNS query string
 // then returns either extracted hosts randomly
-func DNSRebindFromQueryRandom(session string, dcss *DNSClientStateStore, q dns.Question) string {
+func DNSRebindFromQueryRandom(session string, dcss *DNSClientStateStore, q dns.Question) []string {
 	dcss.RLock()
-	host := dcss.Sessions[session].ResponseIPAddr
+	answers := []string{dcss.Sessions[session].ResponseIPAddr}
 	dnsCacheFlush := dcss.Sessions[session].DNSCacheFlush
 	hosts := []string{dcss.Sessions[session].ResponseIPAddr, dcss.Sessions[session].ResponseReboundIPAddr}
 	dcss.RUnlock()
@@ -183,18 +184,18 @@ func DNSRebindFromQueryRandom(session string, dcss *DNSClientStateStore, q dns.Q
 	log.Printf("In DNSRebindFromQueryRandom\n")
 
 	if dnsCacheFlush == false { // This is not a request for cache eviction
-		host = hosts[rand.Intn(len(hosts))]
+		answers = append(answers, hosts[rand.Intn(len(hosts))])
 	}
 
-	return host
+	return answers
 }
 
 // DNSRebindFromQueryRoundRobin is a response handler to DNS queries
 // It extracts the two hosts in the DNS query string
 // then returns the extracted hosts in a round robin fashion
-func DNSRebindFromQueryRoundRobin(session string, dcss *DNSClientStateStore, q dns.Question) string {
+func DNSRebindFromQueryRoundRobin(session string, dcss *DNSClientStateStore, q dns.Question) []string {
 	dcss.RLock()
-	host := dcss.Sessions[session].ResponseIPAddr
+	answers := []string{dcss.Sessions[session].ResponseIPAddr}
 	dnsCacheFlush := dcss.Sessions[session].DNSCacheFlush
 	ResponseIPAddr := dcss.Sessions[session].ResponseIPAddr
 	ResponseReboundIPAddr := dcss.Sessions[session].ResponseReboundIPAddr
@@ -216,10 +217,20 @@ func DNSRebindFromQueryRoundRobin(session string, dcss *DNSClientStateStore, q d
 		dcss.Lock()
 		dcss.Sessions[session].LastResponseReboundIPAddr = LastResponseReboundIPAddr
 		dcss.Unlock()
-		host = (hosts[LastResponseReboundIPAddr])
+		answers = append(answers, (hosts[LastResponseReboundIPAddr]))
 	}
 
-	return host
+	return answers
+}
+
+// DNSRebindFromFromQueryMultiA s a response handler to DNS queries
+// It extracts the two hosts in the DNS query string
+// then returns the extracted hosts as multiple DNS A records
+func DNSRebindFromFromQueryMultiA(session string, dcss *DNSClientStateStore, q dns.Question) []string {
+	dcss.RLock()
+	answers := []string{dcss.Sessions[session].ResponseIPAddr, dcss.Sessions[session].ResponseReboundIPAddr}
+	dcss.RUnlock()
+	return answers
 }
 
 // MakeRebindDNSHandler generates a DNS request handler
@@ -279,16 +290,23 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 					dcss.Sessions[name.Session].DNSCacheFlush = clientState.DNSCacheFlush
 					dcss.Unlock()
 
-					host := rebindingFn(name.Session, dcss, q)
+					answers := rebindingFn(name.Session, dcss, q)
 
-					var response string
+					response := []string{}
 
-					if host == "localhost" {
+					if len(answers) == 1 { //we return only one answer
 
-						response = fmt.Sprintf("%s 10 IN CNAME %s.", q.Name, host)
+						if answers[0] == "localhost" { //we respond with a CNAME record
 
-					} else {
-						response = fmt.Sprintf("%s 0 IN A %s", q.Name, host)
+							response = append(response, fmt.Sprintf("%s 10 IN CNAME %s.", q.Name, answers[0]))
+
+						} else { // We respond with a A record
+							response = append(response, fmt.Sprintf("%s 0 IN A %s", q.Name, answers[0]))
+
+						}
+					} else { // We respond multiple answers
+						response = append(response, fmt.Sprintf("%s 0 IN A %s", q.Name, answers[0]))
+						response = append(response, fmt.Sprintf("%s 0 IN A %s", q.Name, answers[1]))
 
 					}
 
@@ -297,11 +315,15 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 					dcss.Sessions[name.Session].LastQueryTime = now
 					dcss.Unlock()
 
-					rr, err := dns.NewRR(response)
-					if err == nil {
-						m.Answer = append(m.Answer, rr)
-						log.Printf("Response: %v\n", response)
+					for _, resp := range response {
+
+						rr, err := dns.NewRR(resp)
+						if err == nil {
+							m.Answer = append(m.Answer, rr)
+							log.Printf("Response: %v\n", resp)
+						}
 					}
+
 				}
 			}
 		}
@@ -315,6 +337,7 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 // for all routes
 type DefaultHeadersHandler struct {
 	NextHandler http.Handler
+	dcss        *DNSClientStateStore
 }
 
 // HTTPServerStore holds the list of HTTP servers
@@ -326,6 +349,7 @@ type HTTPServerStore struct {
 	sync.RWMutex
 	DynamicServers []*http.Server
 	StaticServers  []*http.Server
+	dcss           *DNSClientStateStore
 }
 
 type httpServerInfo struct {
@@ -341,7 +365,68 @@ type HTTPServersConfig struct {
 }
 
 // HTTP Handler for "/" - Add headers then calls next NextHandler()
+
 func (d *DefaultHeadersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+	//We handle the particular case where we use multiple A records rebinding.
+	// We Hijack the connection from HTTP server if we have a DNS session with browser client
+	// and if this session is more than 3 seconds.
+	// Then we create a Linux iptable rule that drops the connection to the browser
+	// using unsolicated TCP RST packet.
+	// The connection drop is defined by the source address, source port range(current port + 10)
+	// and the server address and port.
+	// the rule is dropped after 10 seconds.
+	// So in the singularity manager interface, we need to ensure that the polling interval is fast, e.g. 1 sec.
+	name, err := NewDNSQuery(r.Host)
+	if err == nil {
+
+		d.dcss.RLock()
+		dnsCacheFlush := d.dcss.Sessions[name.Session].DNSCacheFlush
+		elapsed := time.Now().Sub(d.dcss.Sessions[name.Session].CurrentQueryTime)
+		d.dcss.RUnlock()
+
+		if d.dcss.RebindingStrategy == "DNSRebindFromFromQueryMultiA" {
+			if dnsCacheFlush == false { // This is not a request for cache eviction
+				if elapsed > (time.Second * time.Duration(3)) {
+					log.Printf("Attempting Multiple A records rebinding for: %v", name)
+					hj, ok := w.(http.Hijacker)
+					if !ok {
+						log.Printf("webserver doesn't support hijacking\n")
+						return
+					}
+					conn, bufrw, err := hj.Hijack()
+					if err != nil {
+						log.Printf("could not hijack http server connection: %v\n", err.Error())
+						return
+					}
+
+					defer conn.Close()
+
+					log.Printf("implementing firewall rule for %v\n", conn.RemoteAddr())
+					dst := strings.Split(conn.LocalAddr().String(), ":")
+					src := strings.Split(conn.RemoteAddr().String(), ":")
+					srcAddr := src[0]
+					srcPort := src[1]
+					dstAddr := dst[0]
+					dstPort := dst[1]
+
+					ipTablesRule := NewIPTableRule(srcAddr, srcPort, dstAddr, dstPort)
+					go func(rule *IPTablesRule) {
+						time.Sleep(time.Second * time.Duration(10))
+						ipTablesRule.RemoveRule()
+					}(ipTablesRule)
+
+					ipTablesRule.AddRule()
+
+					bufrw.WriteString("\x00")
+					bufrw.Flush()
+
+					return
+				}
+			}
+		}
+	}
+
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate") // HTTP 1.1
 	w.Header().Set("Pragma", "no-cache")                                   // HTTP 1.0
 	w.Header().Set("Expires", "0")                                         // Proxies
@@ -424,7 +509,7 @@ func (hss *HTTPServerStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		hss.Unlock()
 
-		httpServer := NewHTTPServer(port, hss)
+		httpServer := NewHTTPServer(port, hss, hss.dcss)
 		httpServerErr := StartHTTPServer(httpServer, hss, true)
 
 		if httpServerErr != nil {
@@ -448,8 +533,9 @@ func (hss *HTTPServerStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // NewHTTPServer configures a HTTP server
-func NewHTTPServer(port int, hss *HTTPServerStore) *http.Server {
-	d := &DefaultHeadersHandler{NextHandler: http.FileServer(http.Dir("./html"))}
+func NewHTTPServer(port int, hss *HTTPServerStore, dcss *DNSClientStateStore) *http.Server {
+	d := &DefaultHeadersHandler{NextHandler: http.FileServer(http.Dir("./html")),
+		dcss: dcss}
 	h := http.NewServeMux()
 
 	h.Handle("/", d)
