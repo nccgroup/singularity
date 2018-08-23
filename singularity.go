@@ -368,15 +368,17 @@ type HTTPServersConfig struct {
 
 func (d *DefaultHeadersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	//We handle the particular case where we use multiple A records rebinding.
-	// We Hijack the connection from HTTP server if we have a DNS session with browser client
-	// and if this session is more than 3 seconds.
-	// Then we create a Linux iptable rule that drops the connection to the browser
-	// using unsolicated TCP RST packet.
-	// The connection drop is defined by the source address, source port range(current port + 10)
-	// and the server address and port.
-	// the rule is dropped after 10 seconds.
-	// So in the singularity manager interface, we need to ensure that the polling interval is fast, e.g. 1 sec.
+	//We handle the particular case where we use multiple A records DNS rebinding.
+	// We hijack the connection from the HTTP server
+	// * if we have a DNS session with the client browser
+	// * and if this session is more than 3 seconds.
+	// Then we create a Linux iptables rule that drops the connection from the browser
+	// using an unsolicited TCP RST packet.
+	// The connection being dropped is defined by the source address,
+	// source port range(current port + 10) and the server address and port.
+	// The rule is removed after 10 seconds after being implemented.
+	// In the singularity manager interface,
+	// we need to ensure that the polling interval is fast, e.g. 1 sec.
 	name, err := NewDNSQuery(r.Host)
 	if err == nil {
 
