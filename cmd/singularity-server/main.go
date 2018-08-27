@@ -87,10 +87,11 @@ func main() {
 	appConfig := initFromCmdLine()
 	dcss := &singularity.DNSClientStateStore{Sessions: make(map[string]*singularity.DNSClientState),
 		RebindingStrategy: appConfig.RebindingFnName}
-	hss := &singularity.HTTPServerStore{DynamicServers: make([]*http.Server, 2),
+	hss := &singularity.HTTPServerStoreHandler{DynamicServers: make([]*http.Server, 2),
 		StaticServers: make([]*http.Server, 1),
 		Errc:          make(chan singularity.HTTPServerError, 1),
-		AllowDynamicHTTPServers: appConfig.AllowDynamicHTTPServers}
+		AllowDynamicHTTPServers: appConfig.AllowDynamicHTTPServers,
+		Dcss: dcss}
 
 	// Attach DNS handler function
 	dns.HandleFunc(".", singularity.MakeRebindDNSHandler(appConfig, dcss))

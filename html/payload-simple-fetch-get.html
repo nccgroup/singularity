@@ -18,7 +18,7 @@ function attack() {
 	fetch('/')
 		.then(responseOKOrFail("Could not submit a request to get a list of keys"))
 		.then(function (response) { // we successfully received the server response
-			if (response.includes(indextoken) == false) {
+			if (response.includes(indextoken) == false && response.length > 0) {
 				clearInterval(timer); // stop the attack timer
 				console.log("SUCCESS"); // log to the console
 				// Terminate the attack:

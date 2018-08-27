@@ -25,6 +25,7 @@ func NewIPTableRule(srcAddr string, srcPort string,
 	return &p
 }
 
+// TODO Experimental
 func (ipt *IPTablesRule) generateSourcePortRange(max int) {
 	i, err := strconv.Atoi(ipt.srcPort)
 	if err != nil {
@@ -49,7 +50,7 @@ func (ipt *IPTablesRule) generateSourcePortRange(max int) {
 func (ipt *IPTablesRule) makeAndRunRule(command string) {
 	rule := exec.Command("/sbin/iptables",
 		command, "INPUT", "-p", "tcp", "-j", "REJECT", "--reject-with", "tcp-reset",
-		"--source", ipt.srcAddr, "--sport", ipt.srcPortRange,
+		"--source", ipt.srcAddr, //"--sport" srcPortRange,
 		"--destination", ipt.dstAddr, "--destination-port", ipt.dstPort)
 	err := rule.Run()
 	log.Printf("`iptables` finished with error: %v", err)

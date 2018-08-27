@@ -323,7 +323,6 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 							log.Printf("Response: %v\n", resp)
 						}
 					}
-
 				}
 			}
 		}
@@ -337,19 +336,23 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 // for all routes
 type DefaultHeadersHandler struct {
 	NextHandler http.Handler
-	dcss        *DNSClientStateStore
 }
 
-// HTTPServerStore holds the list of HTTP servers
+// HTTPServerStoreHandler holds the list of HTTP servers
 // Many servers at startup and one (1) dynamically instantianted server
 // Access to the servers list must be performed via mutex
-type HTTPServerStore struct {
+type HTTPServerStoreHandler struct {
 	Errc                    chan HTTPServerError // communicates http server errors
 	AllowDynamicHTTPServers bool
 	sync.RWMutex
 	DynamicServers []*http.Server
 	StaticServers  []*http.Server
-	dcss           *DNSClientStateStore
+	Dcss           *DNSClientStateStore
+}
+
+// IPTablesHandler is a HTTP handler that adds/removes iptables rules
+// if the DNS rebinding strategy is to respond with multiple A records.
+type IPTablesHandler struct {
 }
 
 type httpServerInfo struct {
@@ -367,68 +370,6 @@ type HTTPServersConfig struct {
 // HTTP Handler for "/" - Add headers then calls next NextHandler()
 
 func (d *DefaultHeadersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
-	//We handle the particular case where we use multiple A records DNS rebinding.
-	// We hijack the connection from the HTTP server
-	// * if we have a DNS session with the client browser
-	// * and if this session is more than 3 seconds.
-	// Then we create a Linux iptables rule that drops the connection from the browser
-	// using an unsolicited TCP RST packet.
-	// The connection being dropped is defined by the source address,
-	// source port range(current port + 10) and the server address and port.
-	// The rule is removed after 10 seconds after being implemented.
-	// In the singularity manager interface,
-	// we need to ensure that the polling interval is fast, e.g. 1 sec.
-	name, err := NewDNSQuery(r.Host)
-	if err == nil {
-
-		d.dcss.RLock()
-		dnsCacheFlush := d.dcss.Sessions[name.Session].DNSCacheFlush
-		elapsed := time.Now().Sub(d.dcss.Sessions[name.Session].CurrentQueryTime)
-		d.dcss.RUnlock()
-
-		if d.dcss.RebindingStrategy == "DNSRebindFromFromQueryMultiA" {
-			if dnsCacheFlush == false { // This is not a request for cache eviction
-				if elapsed > (time.Second * time.Duration(3)) {
-					log.Printf("Attempting Multiple A records rebinding for: %v", name)
-					hj, ok := w.(http.Hijacker)
-					if !ok {
-						log.Printf("webserver doesn't support hijacking\n")
-						return
-					}
-					conn, bufrw, err := hj.Hijack()
-					if err != nil {
-						log.Printf("could not hijack http server connection: %v\n", err.Error())
-						return
-					}
-
-					defer conn.Close()
-
-					log.Printf("implementing firewall rule for %v\n", conn.RemoteAddr())
-					dst := strings.Split(conn.LocalAddr().String(), ":")
-					src := strings.Split(conn.RemoteAddr().String(), ":")
-					srcAddr := src[0]
-					srcPort := src[1]
-					dstAddr := dst[0]
-					dstPort := dst[1]
-
-					ipTablesRule := NewIPTableRule(srcAddr, srcPort, dstAddr, dstPort)
-					go func(rule *IPTablesRule) {
-						time.Sleep(time.Second * time.Duration(10))
-						ipTablesRule.RemoveRule()
-					}(ipTablesRule)
-
-					ipTablesRule.AddRule()
-
-					bufrw.WriteString("\x00")
-					bufrw.Flush()
-
-					return
-				}
-			}
-		}
-	}
-
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate") // HTTP 1.1
 	w.Header().Set("Pragma", "no-cache")                                   // HTTP 1.0
 	w.Header().Set("Expires", "0")                                         // Proxies
@@ -437,7 +378,7 @@ func (d *DefaultHeadersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 }
 
 // HTTP Handler for /servers
-func (hss *HTTPServerStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (hss *HTTPServerStoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	serverInfo := httpServerInfo{}
@@ -511,7 +452,7 @@ func (hss *HTTPServerStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		hss.Unlock()
 
-		httpServer := NewHTTPServer(port, hss, hss.dcss)
+		httpServer := NewHTTPServer(port, hss, hss.Dcss)
 		httpServerErr := StartHTTPServer(httpServer, hss, true)
 
 		if httpServerErr != nil {
@@ -534,13 +475,83 @@ func (hss *HTTPServerStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func (ipt *IPTablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+	hj, ok := w.(http.Hijacker)
+	if !ok {
+		log.Printf("webserver doesn't support hijacking\n")
+		return
+	}
+	conn, bufrw, err := hj.Hijack()
+	if err != nil {
+		log.Printf("could not hijack http server connection: %v\n", err.Error())
+		return
+	}
+
+	defer conn.Close()
+
+	log.Printf("implementing firewall rule for %v\n", conn.RemoteAddr())
+	dst := strings.Split(conn.LocalAddr().String(), ":")
+	src := strings.Split(conn.RemoteAddr().String(), ":")
+	srcAddr := src[0]
+	srcPort := src[1]
+	dstAddr := dst[0]
+	dstPort := dst[1]
+
+	ipTablesRule := NewIPTableRule(srcAddr, srcPort, dstAddr, dstPort)
+	go func(rule *IPTablesRule) {
+		time.Sleep(time.Second * time.Duration(5))
+		ipTablesRule.RemoveRule()
+	}(ipTablesRule)
+
+	ipTablesRule.AddRule()
+
+	bufrw.WriteString("HTTP")
+	bufrw.Flush()
+
+}
+
 // NewHTTPServer configures a HTTP server
-func NewHTTPServer(port int, hss *HTTPServerStore, dcss *DNSClientStateStore) *http.Server {
-	d := &DefaultHeadersHandler{NextHandler: http.FileServer(http.Dir("./html")),
-		dcss: dcss}
+func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateStore) *http.Server {
+	d := &DefaultHeadersHandler{NextHandler: http.FileServer(http.Dir("./html"))}
+	ipth := &IPTablesHandler{}
 	h := http.NewServeMux()
 
-	h.Handle("/", d)
+	h.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		//We handle the particular case where we use multiple A records DNS rebinding.
+		// We hijack the connection from the HTTP server
+		// * if we have a DNS session with the client browser
+		// * and if this session is more than 3 seconds.
+		// Then we create a Linux iptables rule that drops the connection from the browser
+		// using an unsolicited TCP RST packet.
+		// The connection being dropped is defined by the source address,
+		// source port range(current port + 10) and the server address and port.
+		// The rule is removed after 10 seconds after being implemented.
+		// In the singularity manager interface,
+		// we need to ensure that the polling interval is fast, e.g. 1 sec.
+
+		name, err := NewDNSQuery(req.Host)
+		if err == nil {
+
+			dcss.RLock()
+			dnsCacheFlush := dcss.Sessions[name.Session].DNSCacheFlush
+			elapsed := time.Now().Sub(dcss.Sessions[name.Session].CurrentQueryTime)
+			rebindingStrategy := dcss.RebindingStrategy
+			dcss.RUnlock()
+
+			if rebindingStrategy == "DNSRebindFromFromQueryMultiA" {
+				if dnsCacheFlush == false { // This is not a request for cache eviction
+					if elapsed > (time.Second * time.Duration(3)) {
+						log.Printf("Attempting Multiple A records rebinding for: %v", name)
+						ipth.ServeHTTP(w, req)
+						return
+					}
+				}
+			}
+		}
+		d.ServeHTTP(w, req)
+	})
+
 	h.Handle("/servers", hss)
 
 	httpServer := &http.Server{Addr: ":" + strconv.Itoa(port), Handler: h}
@@ -561,7 +572,7 @@ type HTTPServerError struct {
 
 // StartHTTPServer starts an HTTP server
 // and adds it to  dynamic (if dynamic is true) or static HTTP Store
-func StartHTTPServer(s *http.Server, hss *HTTPServerStore, dynamic bool) error {
+func StartHTTPServer(s *http.Server, hss *HTTPServerStoreHandler, dynamic bool) error {
 
 	var err error
 
@@ -600,7 +611,7 @@ func StartHTTPServer(s *http.Server, hss *HTTPServerStore, dynamic bool) error {
 }
 
 // StopHTTPServer stops an HTTP server
-func StopHTTPServer(s *http.Server, hss *HTTPServerStore) {
+func StopHTTPServer(s *http.Server, hss *HTTPServerStoreHandler) {
 	log.Printf("Stopping HTTP Server on %v\n", s.Addr)
 	s.Close()
 }

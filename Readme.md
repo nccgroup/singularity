@@ -175,12 +175,29 @@ Singularity has been tested to work in the following browsers:
 | Edge | Windows 10 |  ~21 to ~49 min |
 | Firefox | OSX | ~1 min |
 | Chrome | OSX | ~1 min |
+| Safari | OSX | ~1 min |
 | Chrome | Android | ~1 min |
 | Firefox | Android | ~1 min |
 | Safari | iOS | ~1 min |
 | Firefox | iOS | ~1 min |
 
-Microsoft Internet Explorer is currently not supported. Attacks via Microsoft Edge are possible but take a long time.
+The above was tested with Singularity's default conservative settings: 
+* DNS rebinding strategy: `DNSRebindFromQueryFirstThenSecond`
+* Fetch interval (Web interface): 20s
+* Target: 127.0.0.1.
+
+Much faster attacks can be achieved in certain configurations, as detailed in the table below:
+
+| Browser  | Operating System | Time to Exploit | Rebinding Strategy | Fetch Interval | Target Specification |
+| --- | --- | --- | --- | ---| ---| 
+| Chrome  | Windows 7 / 10 | ~3s | `DNSRebindFromFromQueryMultiA` | 1s | 127.0.0.1 |
+| Edge | Windows 10 |  ~3s | `DNSRebindFromFromQueryMultiA` | 1s |127.0.0.1 |
+| Firefox | Ubuntu | ~3s | `DNSRebindFromFromQueryMultiA` | 1s | 0.0.0.0 |
+| Chromium | Ubuntu | ~3s | `DNSRebindFromFromQueryMultiA` | 1s | 0.0.0.0 |
+| Chrome | OSX | ~3s | `DNSRebindFromFromQueryMultiA` | 1s |0.0.0.0 |
+| Safari | OSX |  ~3s | `DNSRebindFromFromQueryMultiA` | 1s |0.0.0.0 |
+
+We will add more platform as we test them. We elected a delay of 3s to perform DNS rebinding to cater for targets with a poor connection to the internet/network.
 
 ## Using Singularity
 When Singularity is run without arguments, the manager web interface
@@ -204,6 +221,7 @@ Launch the Singularity binary, (`singularity-server`), with the `-h` parameter t
   - `DNSRebindFromQueryRoundRobin`
   - `DNSRebindFromQueryFirstThenSecond` (default)
   - `DNSRebindFromQueryRandom`
+  - `DNSRebindFromFromQueryMultiA`
 - `-HTTPServerPort value` : 
   Specify the attacker HTTP Server port that will serve HTML/JavaScript files. 
   Repeat this flag to listen on more than one HTTP port.
@@ -314,6 +332,7 @@ application via the Google Chrome browser for instance.
  * Test `dig` query: `dig "s-ip.ad.dr.ss-127.0.0.1-<random_number>--e.dynamic.your.domain" @ip.ad.dr.ss`
  * `sudo ./singularity-server -HTTPServerPort 8080 -HTTPServerPort 8081  -dangerouslyAllowDynamicHTTPServers` starts a server on port 8080 and 8081 and enables requesting dynamically one additional HTTP port via the Manager interface.
  * Testing a service for a DNS rebinding vulnerability: In an HTTP intercepting proxy such as Portswigger's Burp Suite, replay a request to `localhost`, replacing the host header value e.g. "localhost" with "attacker.com". If the request is accepted, chances are that you have found a DNS rebinding vulnerability. What you can do after, the impact, depends on the vulnerable application.
+ * The `DNSRebindFromFromQueryMultiA` rebinding strategy does not support the "localhost" target value if trying to evade IPS/IDS and DNS filters.
 
 
 ## Contributing

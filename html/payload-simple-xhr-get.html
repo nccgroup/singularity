@@ -43,6 +43,11 @@
                             return;
                         }
 
+                        if (responseText.length == 0 ) { //sometimes the response is empty.
+                            console.log("Response length is 0. Retrying...");
+                            return;
+                        }
+
                         // No need to retry, the attack succeeded.
                         clearInterval(timer);
 
