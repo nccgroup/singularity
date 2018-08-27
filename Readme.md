@@ -190,7 +190,7 @@ Much faster attacks can be achieved in certain configurations, as detailed in th
 
 | Browser  | Operating System | Time to Exploit | Rebinding Strategy | Fetch Interval | Target Specification |
 | --- | --- | --- | --- | ---| ---| 
-| Chrome  | Windows 7 / 10 | ~3s | `DNSRebindFromFromQueryMultiA` | 1s | 127.0.0.1 |
+| Chrome  | Windows 10 | ~3s | `DNSRebindFromFromQueryMultiA` | 1s | 127.0.0.1 |
 | Edge | Windows 10 |  ~3s | `DNSRebindFromFromQueryMultiA` | 1s |127.0.0.1 |
 | Firefox | Ubuntu | ~3s | `DNSRebindFromFromQueryMultiA` | 1s | 0.0.0.0 |
 | Chromium | Ubuntu | ~3s | `DNSRebindFromFromQueryMultiA` | 1s | 0.0.0.0 |
