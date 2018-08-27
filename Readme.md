@@ -221,7 +221,7 @@ Launch the Singularity binary, (`singularity-server`), with the `-h` parameter t
   - `DNSRebindFromQueryRoundRobin`
   - `DNSRebindFromQueryFirstThenSecond` (default)
   - `DNSRebindFromQueryRandom`
-  - `DNSRebindFromFromQueryMultiA`
+  - `DNSRebindFromFromQueryMultiA` (experimental)
 - `-HTTPServerPort value` : 
   Specify the attacker HTTP Server port that will serve HTML/JavaScript files. 
   Repeat this flag to listen on more than one HTTP port.
