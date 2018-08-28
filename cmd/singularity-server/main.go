@@ -34,7 +34,7 @@ func initFromCmdLine() *singularity.AppConfig {
 	var myArrayPortFlags arrayPortFlags
 
 	var dnsRebindingStrategy = flag.String("DNSRebindStrategy", "DNSRebindFromQueryFirstThenSecond",
-		"Specify how to respond to DNS queries from a victim client:  \"DNSRebindFromQueryRoundRobin\", \"DNSRebindFromQueryFirstThenSecond\", \"DNSRebindFromQueryRandom\", DNSRebindFromFromQueryMultiA\"")
+		"Specify how to respond to DNS queries from a victim client:  \"DNSRebindFromQueryRoundRobin\", \"DNSRebindFromQueryFirstThenSecond\", \"DNSRebindFromQueryRandom\", DNSRebindFromQueryMultiA\"")
 	var responseIPAddr = flag.String("ResponseIPAddr", "192.168.0.1",
 		"Specify the attacker host IP address that will be rebound to the victim host address using strategy specified by flag \"-DNSRebingStrategy\"")
 	var responseReboundIPAddr = flag.String("ResponseReboundIPAddr", "127.0.0.1",
@@ -59,8 +59,8 @@ func initFromCmdLine() *singularity.AppConfig {
 			appConfig.RebindingFn = singularity.DNSRebindFromQueryFirstThenSecond
 		case "DNSRebindFromQueryRandom":
 			appConfig.RebindingFn = singularity.DNSRebindFromQueryRandom
-		case "DNSRebindFromFromQueryMultiA":
-			appConfig.RebindingFn = singularity.DNSRebindFromFromQueryMultiA
+		case "DNSRebindFromQueryMultiA":
+			appConfig.RebindingFn = singularity.DNSRebindFromQueryMultiA
 		default:
 			log.Fatal("No valid DNS rebinding strategy provided")
 		}

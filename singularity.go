@@ -223,10 +223,10 @@ func DNSRebindFromQueryRoundRobin(session string, dcss *DNSClientStateStore, q d
 	return answers
 }
 
-// DNSRebindFromFromQueryMultiA s a response handler to DNS queries
+// DNSRebindFromQueryMultiA s a response handler to DNS queries
 // It extracts the two hosts in the DNS query string
 // then returns the extracted hosts as multiple DNS A records
-func DNSRebindFromFromQueryMultiA(session string, dcss *DNSClientStateStore, q dns.Question) []string {
+func DNSRebindFromQueryMultiA(session string, dcss *DNSClientStateStore, q dns.Question) []string {
 	dcss.RLock()
 	answers := []string{dcss.Sessions[session].ResponseIPAddr, dcss.Sessions[session].ResponseReboundIPAddr}
 	dcss.RUnlock()
@@ -539,7 +539,7 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 			rebindingStrategy := dcss.RebindingStrategy
 			dcss.RUnlock()
 
-			if rebindingStrategy == "DNSRebindFromFromQueryMultiA" {
+			if rebindingStrategy == "DNSRebindFromQueryMultiA" {
 				if dnsCacheFlush == false { // This is not a request for cache eviction
 					if elapsed > (time.Second * time.Duration(3)) {
 						log.Printf("Attempting Multiple A records rebinding for: %v", name)

@@ -39,6 +39,8 @@ When the DNS record times out, the Singularity DNS server responds with the IP
 address of the target host (e.g. 127.0.0.1) and the victim's browser can access
 the target application, circumventing the browser's same-origin policy.
 
+It is also possible to trigger DNS rebinding before a cached DNS record expires, depending of the target platform and using a combination of techniques that are described in later sections.
+
 
 
 ## Features
@@ -53,6 +55,7 @@ the target application, circumventing the browser's same-origin policy.
   * Disabling HTTP keep alive, caching, DNS prefetching
   * Aggressive DNS response TTLs
   * Option to use DNS CNAME instead of A records to evade several DNS filtering solutions
+  * Near instant rebinding for several browser and OS combinations, using multiple DNS answers and dynamic HTTP port blocking.
 * Ability to allocate HTTP servers at startup or dynamically thereafter
   * A convenience feature to avoid restarting Singularity to listen on a different HTTP port.
   * To lay the ground work to attack vulnerable ports discovered after a scan.
@@ -190,14 +193,14 @@ Much faster attacks can be achieved in certain configurations, as detailed in th
 
 | Browser  | Operating System | Time to Exploit | Rebinding Strategy | Fetch Interval | Target Specification |
 | --- | --- | --- | --- | ---| ---| 
-| Chrome  | Windows 10 | ~3s | `DNSRebindFromFromQueryMultiA` | 1s | 127.0.0.1 |
-| Edge | Windows 10 |  ~3s | `DNSRebindFromFromQueryMultiA` | 1s |127.0.0.1 |
-| Firefox | Ubuntu | ~3s | `DNSRebindFromFromQueryMultiA` | 1s | 0.0.0.0 |
-| Chromium | Ubuntu | ~3s | `DNSRebindFromFromQueryMultiA` | 1s | 0.0.0.0 |
-| Chrome | OSX | ~3s | `DNSRebindFromFromQueryMultiA` | 1s |0.0.0.0 |
-| Safari | OSX |  ~3s | `DNSRebindFromFromQueryMultiA` | 1s |0.0.0.0 |
+| Chrome  | Windows 10 | ~3s | `DNSRebindFromQueryMultiA` | 1s | 127.0.0.1 |
+| Edge | Windows 10 |  ~3s | `DNSRebindFromQueryMultiA` | 1s |127.0.0.1 |
+| Firefox | Ubuntu | ~3s | `DNSRebindFromQueryMultiA` | 1s | 0.0.0.0 |
+| Chromium | Ubuntu | ~3s | `DNSRebindFromQueryMultiA` | 1s | 0.0.0.0 |
+| Chrome | OSX | ~3s | `DNSRebindFromQueryMultiA` | 1s |0.0.0.0 |
+| Safari | OSX |  ~3s | `DNSRebindFromQueryMultiA` | 1s |0.0.0.0 |
 
-We will add more platform as we test them. We elected a delay of 3s to perform DNS rebinding to cater for targets with a poor connection to the internet/network.
+We will add more platforms as we test them. We elected a delay of 3s to perform DNS rebinding to cater for targets with a poor connection to the internet/network.
 
 ## Using Singularity
 When Singularity is run without arguments, the manager web interface
@@ -221,7 +224,7 @@ Launch the Singularity binary, (`singularity-server`), with the `-h` parameter t
   - `DNSRebindFromQueryRoundRobin`
   - `DNSRebindFromQueryFirstThenSecond` (default)
   - `DNSRebindFromQueryRandom`
-  - `DNSRebindFromFromQueryMultiA` (experimental)
+  - `DNSRebindFromQueryMultiA` (experimental, requires Linux `iptables`)
 - `-HTTPServerPort value` : 
   Specify the attacker HTTP Server port that will serve HTML/JavaScript files. 
   Repeat this flag to listen on more than one HTTP port.
@@ -332,7 +335,8 @@ application via the Google Chrome browser for instance.
  * Test `dig` query: `dig "s-ip.ad.dr.ss-127.0.0.1-<random_number>--e.dynamic.your.domain" @ip.ad.dr.ss`
  * `sudo ./singularity-server -HTTPServerPort 8080 -HTTPServerPort 8081  -dangerouslyAllowDynamicHTTPServers` starts a server on port 8080 and 8081 and enables requesting dynamically one additional HTTP port via the Manager interface.
  * Testing a service for a DNS rebinding vulnerability: In an HTTP intercepting proxy such as Portswigger's Burp Suite, replay a request to `localhost`, replacing the host header value e.g. "localhost" with "attacker.com". If the request is accepted, chances are that you have found a DNS rebinding vulnerability. What you can do after, the impact, depends on the vulnerable application.
- * The `DNSRebindFromFromQueryMultiA` rebinding strategy does not support the "localhost" target value if trying to evade IPS/IDS and DNS filters.
+ * Use the `DNSRebindFromQueryMultiA` strategy for instant rebinding when supported by the target browser/OS combination and with the tested settings, summarized in the table above.
+ * The `DNSRebindFromQueryMultiA` rebinding strategy does not support the "localhost" target value if trying to evade IPS/IDS and DNS filters.
 
 
 ## Contributing
