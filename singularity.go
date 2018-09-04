@@ -305,8 +305,8 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 
 						}
 					} else { // We respond multiple answers
-						response = append(response, fmt.Sprintf("%s 0 IN A %s", q.Name, answers[0]))
-						response = append(response, fmt.Sprintf("%s 0 IN A %s", q.Name, answers[1]))
+						response = append(response, fmt.Sprintf("%s 10 IN A %s", q.Name, answers[0]))
+						response = append(response, fmt.Sprintf("%s 10 IN A %s", q.Name, answers[1]))
 
 					}
 
