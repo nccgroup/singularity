@@ -226,7 +226,7 @@ Launch the Singularity binary, (`singularity-server`), with the `-h` parameter t
   - `DNSRebindFromQueryRoundRobin`
   - `DNSRebindFromQueryFirstThenSecond` (default)
   - `DNSRebindFromQueryRandom`
-  - `DNSRebindFromQueryMultiA` (experimental, requires Linux `iptables`)
+  - `DNSRebindFromQueryMultiA` (requires Linux `iptables`)
 - `-HTTPServerPort value` : 
   Specify the attacker HTTP Server port that will serve HTML/JavaScript files. 
   Repeat this flag to listen on more than one HTTP port.
@@ -283,12 +283,14 @@ Singularity supports the following attack payloads:
   This payload can be adapted to exploit any software that exposes Chrome Dev Tools on `localhost`.
 * **etcd** (`payload-etcd.html`): This payload retrieves the keys and values from
   the [etcd](https://github.com/coreos/etcd) key-value store.
-* **pyethapp** (`payload-pyethapp.html`): Exploit the Python implementation of the 
+* **pyethapp** (`payload-pyethapp.html`): Exploits the Python implementation of the 
   Ethereum client [Pyethapp](https://github.com/ethereum/pyethapp) to get the
   list of owned eth addresses and retrieve the balance of the first eth address.
 * **Rails Web Console** (`payload-rails-webconsole.html`): Performs a remote code
   execution (RCE) attack on the [Rails Web Console](https://github.com/rails/web-console).
-
+* **AWS Metadata** (`payload-aws-metadata.html`): Forces a headless browser to exfiltrate AWS metadata 
+  including private keys to a given host. Check the payload contents for addtional details how to setup 
+  the attack.
 
 ### Creating Your Own Payloads
 
