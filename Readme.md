@@ -195,9 +195,11 @@ Much faster attacks can be achieved in certain configurations, as detailed in th
 | --- | --- | --- | --- | ---| ---| 
 | Chrome  | Windows 10 | ~3s | `DNSRebindFromQueryMultiA` | 1s | 127.0.0.1 |
 | Edge | Windows 10 |  ~3s | `DNSRebindFromQueryMultiA` | 1s |127.0.0.1 |
-| Firefox | Ubuntu | ~3s | `DNSRebindFromQueryMultiA` | 1s | 0.0.0.0 |
+| Firefox | Windows 10 | ~3s | `DNSRebindFromQueryMultiA` | 1s | 127.0.0.1 |
 | Chromium | Ubuntu | ~3s | `DNSRebindFromQueryMultiA` | 1s | 0.0.0.0 |
+| Firefox | Ubuntu | ~3s | `DNSRebindFromQueryMultiA` | 1s | 0.0.0.0 |
 | Chrome | OSX | ~3s | `DNSRebindFromQueryMultiA` | 1s |0.0.0.0 |
+| Firefox | OSX |  ~3s | `DNSRebindFromQueryMultiA` | 1s |0.0.0.0 |
 | Safari | OSX |  ~3s | `DNSRebindFromQueryMultiA` | 1s |0.0.0.0 |
 
 We will add more platforms as we test them. We elected a delay of 3s to perform DNS rebinding to cater for targets with a poor connection to the internet/network.

