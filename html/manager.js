@@ -31,7 +31,7 @@ window.addEventListener("message", function (msg) {
 
     if (msg.data.status == "start") {
         console.log("Iframe reports that attack has started");
-        clearInterval(timerAttackFrameOne);     
+        clearInterval(timerAttackFrameOne);
         msg.source.postMessage({
             cmd: "interval",
             param: document.getElementById("interval").value
@@ -52,8 +52,10 @@ window.addEventListener("message", function (msg) {
             cmd: "stop"
         }, "*");
 
-        delaydomloadframe.src = "about:blank";
-
+        setTimeout(function () {
+            delaydomloadframe.src = "about:blank";
+        }, 10000);
+        
         if (runningConfig.alertSuccess !== "false") {
             alert("Attack Successful: " + document.domain + " " + msg.data.response);
         }
