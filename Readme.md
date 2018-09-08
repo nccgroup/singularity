@@ -176,9 +176,9 @@ Singularity has been tested to work in the following browsers:
 | Firefox | Ubuntu | ~1 min |
 | Chromium | Ubuntu | ~1 min |
 | Edge | Windows 10 |  ~21 to ~49 min |
-| Firefox | OSX | ~1 min |
-| Chrome | OSX | ~1 min |
-| Safari | OSX | ~1 min |
+| Firefox | macOS | ~1 min |
+| Chrome | macOS | ~1 min |
+| Safari | macOS | ~1 min |
 | Chrome | Android | ~1 min |
 | Firefox | Android | ~1 min |
 | Safari | iOS | ~1 min |
@@ -198,9 +198,9 @@ Much faster attacks can be achieved in certain configurations, as detailed in th
 | Firefox | Windows 10 | ~3s | `DNSRebindFromQueryMultiA` | 1s | 127.0.0.1 |
 | Chromium | Ubuntu | ~3s | `DNSRebindFromQueryMultiA` | 1s | 0.0.0.0 |
 | Firefox | Ubuntu | ~3s | `DNSRebindFromQueryMultiA` | 1s | 0.0.0.0 |
-| Chrome | OSX | ~3s | `DNSRebindFromQueryMultiA` | 1s |0.0.0.0 |
-| Firefox | OSX |  ~3s | `DNSRebindFromQueryMultiA` | 1s |0.0.0.0 |
-| Safari | OSX |  ~3s | `DNSRebindFromQueryMultiA` | 1s |0.0.0.0 |
+| Chrome | macOS | ~3s | `DNSRebindFromQueryMultiA` | 1s |0.0.0.0 |
+| Firefox | macOS |  ~3s | `DNSRebindFromQueryMultiA` | 1s |0.0.0.0 |
+| Safari | macOS |  ~3s | `DNSRebindFromQueryMultiA` | 1s |0.0.0.0 |
 
 We will add more platforms as we test them. We elected a delay of 3s to perform DNS rebinding to cater for targets with a poor connection to the internet/network.
 
@@ -289,7 +289,7 @@ Singularity supports the following attack payloads:
 * **Rails Web Console** (`payload-rails-webconsole.html`): Performs a remote code
   execution (RCE) attack on the [Rails Web Console](https://github.com/rails/web-console).
 * **AWS Metadata** (`payload-aws-metadata.html`): Forces a headless browser to exfiltrate AWS metadata 
-  including private keys to a given host. Check the payload contents for addtional details how to setup 
+  including private keys to a given host. Check the payload contents for additional details on how to setup 
   the attack.
 
 ### Creating Your Own Payloads
@@ -329,7 +329,7 @@ application via the Google Chrome browser for instance.
 
 ## Advanced Techniques
 * Use the `-DNSRebindStrategy DNSRebindFromQueryRandom` DNS rebinding strategy instead of the default `- DNSRebindStrategy DNSRebindFromQueryFirstThenSecond` if you suspect the presence of an IDS in one or more environments that sends several DNS requests to the attack server in addition to the actual target. This will ensure that the target will eventually obtain the required IP address, albeit a bit more slowly.
-* Singularity responds with a DNS CNAME instead of an A record if one specifies "localhost" as the target instead of "127.0.0.1". This may work around DNS filtering of responses containing "127.0.0.1", at least on Chrome and Firefox. Chrome & Firefox appear to look at their internal database upon reception of the CNAME record containing "localhost" instead of making another DNS lookup. Chrome populates its DNS cache with both "127.0.0.1" and "::1" in particular. Related: https://tools.ietf.org/html/draft-west-let-localhost-be-localhost-06.
+* Singularity responds with a DNS CNAME instead of an A record if one specifies "localhost" as the target instead of "127.0.0.1". This works around DNS filtering of responses containing "127.0.0.1" in some configurations. Some browsers appear to perform their own lookup upon reception of a CNAME record containing "localhost". Chrome populates its DNS cache with both "127.0.0.1" and "::1" in particular. Related: https://tools.ietf.org/html/draft-west-let-localhost-be-localhost-06.
 * Similarly, specifying "0.0.0.0" on Mac and Linux, which corresponds to "this host, on any interface" on these platforms may work around some filters/controls.
 
 ## Useful Notes and Other Loose Ends
