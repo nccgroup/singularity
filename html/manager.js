@@ -22,6 +22,14 @@ runningConfig.delayDOMLoad = getParameterByName("delaydomload");
 // * or to freeze a headless browser forever (unless performing a DoS attack).
 runningConfig.alertSuccess = getParameterByName("alertsuccess");
 
+document.onreadystatechange = function () {
+    if (document.readyState === "interactive") {
+        if (runningConfig.delayDOMLoad === null) {
+            delaydomloadframe.parentNode.removeChild(delaydomloadframe);
+        }
+    }
+}
+
 // communication handler between manager and attack iframe.
 window.addEventListener("message", function (msg) {
     console.log("Message received from: ", msg.origin, msg.data.status);
@@ -55,7 +63,7 @@ window.addEventListener("message", function (msg) {
         setTimeout(function () {
             delaydomloadframe.src = "about:blank";
         }, 10000);
-        
+
         if (runningConfig.alertSuccess !== "false") {
             alert("Attack Successful: " + document.domain + " " + msg.data.response);
         }
@@ -247,9 +255,6 @@ document.addEventListener("DOMContentLoaded", function (event) {
     Promise.all([HTTPServersConfig, payloadsAndTargets]).then(function (values) {
         //start attack on page load if ?startattack is set      
         if (runningConfig.automatic !== null) {
-            if (runningConfig.delayDOMLoad === null) {
-                delaydomloadframe.src = "about:blank";
-            }
             begin();
         }
     });

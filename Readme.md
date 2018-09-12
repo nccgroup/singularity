@@ -355,6 +355,7 @@ requests and the noblest of all contributions: good, clean pull requests.
 ## Credits
 * Singularity is strongly inspired by @taviso's rbndr service (https://github.com/taviso/rbndr) and his Blizzard DNS rebinding test case (https://lock.cmpxchg8b.com/yah4od7N.html). Singularity front-end code is based on the latter.
 * The Chrome DevTools payload is based on @CodeColorist's blog post: https://medium.com/0xcc/visual-studio-code-silently-fixed-a-remote-code-execution-vulnerability-8189e85b486b.
+* The DOM load delaying technique described in the following blog post from Alexandre Kaskasoli was adapted for Singularity: https://labs.mwrinfosecurity.com/blog/from-http-referer-to-aws-security-credentials/.
 * Singularity uses miekg's DNS library (https://github.com/miekg/dns).
 
 ## Disclaimer
