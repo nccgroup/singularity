@@ -15,9 +15,6 @@
         "name": "payload-exposed-chrome-devtools.html",
         "ports": [9333]
     }, {
-        "name": "payload-duplicati-rce.html",
-        "ports": [8200]
-    }, {
         "name": "payload-etcd.html",
         "ports": [2379]
     }, {
@@ -29,7 +26,10 @@
     }, {
         "name": "payload-aws-metadata.html",
         "ports": [80]
-    },{
+    }, {
+        "name": "payload-duplicati-rce.html",
+        "ports": [8200]
+    }, {
         "name": "payload-exposed-webpdb.html",
         "ports": []
     }]
