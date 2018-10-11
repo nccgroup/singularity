@@ -291,6 +291,13 @@ Singularity supports the following attack payloads:
 * **AWS Metadata** (`payload-aws-metadata.html`): Forces a headless browser to exfiltrate AWS metadata 
   including private keys to a given host. Check the payload contents for additional details on how to setup 
   the attack.
+* **Duplicati RCE** (payload-duplicati-rce.html): This payload exploits the
+  Duplicati backup client and performs a remote code execution (RCE) attack.
+  For this attack to work, parameter `targetURL` in file `payload-duplicati-rce.html` must be updated to 
+  point to a valid Duplicati backup containing the actual RCE payload, 
+  a shell script.
+* **WebPDB** (payload-exposed-webpdb): A generic RCE payload to exploit `PDB`, 
+  a python debugger exposed via websockets.
 
 ### Creating Your Own Payloads
 
