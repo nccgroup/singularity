@@ -94,7 +94,7 @@ function reloadAttackFrameOne() {
         .replace("%1", document.getElementById("attackhostipaddress").value)
         .replace("%2", document.getElementById("targethostipaddress").value)
         .replace("%3", Math.floor(Math.random() * Math.floor(Number.MAX_SAFE_INTEGER)))
-        .replace("%4", "")
+        .replace("%4", document.getElementById("rebindingstrategies").value)
         .replace("%5", document.getElementById("attackhostdomain").value)
         .replace("%6", document.getElementById("targetport").value)
         .replace("%7", document.getElementById("payloads").value) +

@@ -19,6 +19,14 @@ import (
 
 /*** General Stuff ***/
 
+//DNSRebindingStrategy maps a DNS Rebinding strategy name to a function
+var DNSRebindingStrategy = map[string]func(session string, dcss *DNSClientStateStore, q dns.Question) []string{
+	"fromqueryroundrobin":      DNSRebindFromQueryRoundRobin,
+	"fromqueryfirstthensecond": DNSRebindFromQueryFirstThenSecond,
+	"fromqueryrandom":          DNSRebindFromQueryRandom,
+	"fromquerymultia":          DNSRebindFromQueryMultiA,
+}
+
 // DNSClientStateStore stores DNS sessions
 // It permits to respond to multiple clients
 // based on their current DNS rebinding state.
@@ -74,6 +82,7 @@ type DNSQuery struct {
 	ResponseIPAddr        string
 	ResponseReboundIPAddr string
 	Session               string
+	DNSRebindingStrategy  string
 	DNSCacheFlush         bool
 	Domain                string
 }
@@ -131,9 +140,12 @@ func NewDNSQuery(qname string) (*DNSQuery, error) {
 
 	}
 
-	if len(elements[3]) != 0 {
+	/*if len(elements[3]) != 0 {
 		name.DNSCacheFlush = true
 	}
+	*/
+
+	name.DNSRebindingStrategy = elements[3]
 
 	name.Domain = fmt.Sprintf(".%v", domainSuffix)
 
@@ -273,6 +285,9 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 						clientState.ResponseIPAddr = name.ResponseIPAddr
 						clientState.ResponseReboundIPAddr = name.ResponseReboundIPAddr
 						clientState.DNSCacheFlush = name.DNSCacheFlush
+						if fn, ok := DNSRebindingStrategy[name.DNSRebindingStrategy]; ok {
+							rebindingFn = fn
+						}
 					}
 
 					_, keyExists := dcss.Sessions[name.Session]
@@ -567,10 +582,10 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 			dcss.RLock()
 			dnsCacheFlush := dcss.Sessions[name.Session].DNSCacheFlush
 			elapsed := time.Now().Sub(dcss.Sessions[name.Session].CurrentQueryTime)
-			rebindingStrategy := dcss.RebindingStrategy
+			//rebindingStrategy := dcss.RebindingStrategy
 			dcss.RUnlock()
 
-			if rebindingStrategy == "DNSRebindFromQueryMultiA" {
+			if name.DNSRebindingStrategy == "fromquerymultia" {
 				if dnsCacheFlush == false { // This is not a request for cache eviction
 					if elapsed > (time.Second * time.Duration(3)) {
 						log.Printf("Attempting Multiple A records rebinding for: %v", name)

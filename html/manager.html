@@ -15,7 +15,8 @@
     <div class="container-fluid">
         <h3>Singularity of Origin DNS Rebinding Attack</h3>
         <small class="text-muted">
-            This attack typically takes ~1 min to work. This duration can be reduced to ~3s with the appropriate options. Check the <a href="https://github.com/nccgroup/singularity">documentation</a>.
+            This attack typically takes ~1 min to work. This duration can be reduced to ~3s with the appropriate
+            options. Check the <a href="https://github.com/nccgroup/singularity">documentation</a>.
         </small>
 
         <form action="javascript:void(0);">
@@ -24,7 +25,8 @@
                     <label for="attackhostdomain">Attack Host Domain</label>
                 </div>
                 <div class="col-5">
-                    <input id=attackhostdomain class="form-control" placeholder="e.g. dynamic.attacker.com" value="" spellcheck="false" />
+                    <input id=attackhostdomain class="form-control" placeholder="e.g. dynamic.attacker.com" value=""
+                        spellcheck="false" />
                 </div>
             </div>
             <div class="form-group row">
@@ -32,7 +34,8 @@
                     <label for="attackhostipaddress">Attack Host</label>
                 </div>
                 <div class="col-4">
-                    <input id=attackhostipaddress class="form-control" placeholder="xxx.xxx.xxx.xxx" value="" spellcheck="false" />
+                    <input id=attackhostipaddress class="form-control" placeholder="xxx.xxx.xxx.xxx" value=""
+                        spellcheck="false" />
                 </div>
                 <div class="col-2">
                     <label for="targethostipaddress">Target Host</label>
@@ -48,7 +51,8 @@
                         <label for="targetport">Target Port</label>
                     </div>
                     <div class="col-2">
-                        <input id=targetport class="form-control" aria-describedby="targetportHelp" placeholder="e.g. 80" value="" />
+                        <input id=targetport class="form-control" aria-describedby="targetportHelp" placeholder="e.g. 80"
+                            value="" />
 
                     </div>
                     <div class="col-2">
@@ -59,7 +63,9 @@
                 <div class="row">
                     <div class="col-12">
                         <small id="targetportHelp" class="form-text text-muted">Attack server listening on:
-                            <span id=listenports>unknown</span>. The attack and target hosts must be listening on the same port. The "Request New Port" button is only available when the server is started with the "-dangerouslyAllowDynamicHTTPServers" command line argument. </small>
+                            <span id=listenports>unknown</span>. The attack and target hosts must be listening on the
+                            same port. The "Request New Port" button is only available when the server is started with
+                            the "-dangerouslyAllowDynamicHTTPServers" command line argument. </small>
                     </div>
                 </div>
             </div>
@@ -73,7 +79,7 @@
                 </div>
             </div>
 
-            
+
 
             <div class="form-group row">
                 <div class="col-3">
@@ -83,62 +89,87 @@
                     <input onclick="toggle()" type=submit value="Toggle Advanced Options">
                 </div>
                 <div class="col-3">
-                    <input onclick="forceCacheEviction()" class="d-none" id=evict type=submit value="Force Cache Eviction" title="Try this if the attack is taking too long">
+                    <input onclick="forceCacheEviction()" class="d-none" id=evict type=submit value="Force Cache Eviction"
+                        title="Try this if the attack is taking too long">
                 </div>
             </div>
 
             <div id=advanced class="d-none">
 
-                    <div class="form-group row d-none">
-                        <div class="col-2">
-                            <label for="dummyport">Dummy Port</label>
-                        </div>
-                        <div class="col-2">
-                            <input id=dummyport class="form-control" aria-describedby="dummyportHelp" value="4000" />
-                        </div>
-                        <div class="col-8">
-                            <small id="dummyportHelp" class="form-text text-muted">Specify a port on which the attack host does not listen to permit browser fast DNS cache eviction.
-                                If not possible, use a reachable port serviced by a web server.</small>
-                        </div>
+                <div class="form-group row d-none">
+                    <div class="col-2">
+                        <label for="dummyport">Dummy Port</label>
                     </div>
-    
-                    <div class="form-group row">
-                        <div class="col-2">
-                            <label for="interval">Interval</label>
-                        </div>
-                        <div class="col-2">
-                            <input id=interval class="form-control" aria-describedby="intervalHelp" value="20" />
-                        </div>
-                        <div class="col-8">
-                            <small id="intervalHelp" class="form-text text-muted">How long to wait between attempts in seconds.</small>
-                        </div>
+                    <div class="col-2">
+                        <input id=dummyport class="form-control" aria-describedby="dummyportHelp" value="4000" />
                     </div>
-    
-                    <div class="form-group row">
-                        <div class="col-2">
-                            <label for="indextoken">Index Token</label>
-                        </div>
-                        <div class="col-3">
-                            <input id=indextoken class="form-control" aria-describedby="indextokenHelp" value="thisismytesttoken" spellcheck="false"
-                            />
-                        </div>
-                        <div class="col-7">
-                            <small id="indextokenHelp" class="form-text text-muted">The attack uses this string to recognize whether it is accessing the attacker or target host. it
-                                must be placed in the index page of the attacker web server.</small>
-                        </div>
+                    <div class="col-8">
+                        <small id="dummyportHelp" class="form-text text-muted">Specify a port on which the attack host
+                            does not listen to permit browser fast DNS cache eviction.
+                            If not possible, use a reachable port serviced by a web server.</small>
                     </div>
-    
                 </div>
+
+                <div class="form-group row">
+                    <div class="col-2">
+                        <label for="rebindingstrategy">Rebinding Strategy</label>
+                    </div>
+                    <div class="col-3">
+                        <select id="rebindingstrategies" class="rebindingstrategies-dropdown-content">
+                            <option value="FromQueryFirstThenSecond">First then second (default, conservative)</option>
+                            <option value="FromQueryMultiA">Multiple answers (fast)</option>
+                            <option value="FromQueryRoundRobin">Round Robin (IPS/filters evasion)</option>
+                            <option value="FromQueryRandom">Random (IPS/filters evasion)</option>
+                        </select>
+                    </div>
+                    <div class="col-7">
+                            <small id="rebindingstrategyHelp" class="form-text text-muted">
+                                Read the docs if changing from the default value to ensure that the attack will succeed.
+                            </small>
+                        </div>
+                </div>
+
+                <div class="form-group row">
+                    <div class="col-2">
+                        <label for="interval">Interval</label>
+                    </div>
+                    <div class="col-2">
+                        <input id=interval class="form-control" aria-describedby="intervalHelp" value="20" />
+                    </div>
+                    <div class="col-8">
+                        <small id="intervalHelp" class="form-text text-muted">How long to wait between attempts in
+                            seconds.</small>
+                    </div>
+                </div>
+
+                <div class="form-group row">
+                    <div class="col-2">
+                        <label for="indextoken">Index Token</label>
+                    </div>
+                    <div class="col-3">
+                        <input id=indextoken class="form-control" aria-describedby="indextokenHelp" value="thisismytesttoken"
+                            spellcheck="false" />
+                    </div>
+                    <div class="col-7">
+                        <small id="indextokenHelp" class="form-text text-muted">The attack uses this string to
+                            recognize whether it is accessing the attacker or target host. it
+                            must be placed in the index page of the attacker web server.</small>
+                    </div>
+                </div>
+
+            </div>
 
         </form>
 
 
         <div id=message class="d-none">
-            Please wait for DNS cache entries to expire. Inspect Google's Chrome cache with URL "chrome://net-internals/#dns".
+            Please wait for DNS cache entries to expire. Inspect Google's Chrome cache with URL
+            "chrome://net-internals/#dns".
         </div>
 
         <iframe id=attackframeone src="about:blank"></iframe>
         <iframe id=delaydomloadframe src="/delaydomload" class="d-none"></iframe>
     </div>
 </body>
+
 </html>
