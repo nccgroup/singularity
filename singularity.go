@@ -242,6 +242,7 @@ func DNSRebindFromQueryMultiA(session string, dcss *DNSClientStateStore, q dns.Q
 	dcss.RLock()
 	answers := []string{dcss.Sessions[session].ResponseIPAddr, dcss.Sessions[session].ResponseReboundIPAddr}
 	dcss.RUnlock()
+	log.Printf("In DNSRebindFromQueryMultiA\n")
 	return answers
 }
 
