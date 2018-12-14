@@ -113,8 +113,8 @@ $ go build
  ```bash
 $ cd ~/
 $ mkdir -p singularity/html
-$ cp ~/go/src/github.com/nccgroup/singularity/cmd/singularity-server ~/singularity/
-$ cp ~/go/src/github.com/nccgroup/singularity/html/* /singularity/html/*
+$ cp ~/go/src/github.com/nccgroup/singularity/cmd/singularity-server/singularity-server ~/singularity/
+$ cp ~/go/src/github.com/nccgroup/singularity/html/* ~/singularity/html/
  ```
 
 #### Run
