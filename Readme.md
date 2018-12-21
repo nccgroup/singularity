@@ -118,7 +118,7 @@ $ cp ~/go/src/github.com/nccgroup/singularity/html/* /singularity/html/*
  ```
 
 #### Run
- Start `singularity-server` with `sudo ./singularity-server --HTTPServerPort  8080`. This will use a DNS rebinding strategy based on the content of the DNS query by default e.g. `s-ip.ad.dr.ss-127.0.0.1-<random_number>--e.dynamic.your.domain` will return first  "*ip.ad.dr.ss*", the attacker host IP address, then  "127.0.0.1" for subsequent queries for a limited period of time.
+ Start `singularity-server` with `sudo ./singularity-server --HTTPServerPort  8080`. This will use a DNS rebinding strategy based on the content of the DNS query by default e.g. `s-ip.ad.dr.ss-127.0.0.1-<random_number>-fromqueryfirstthensecond-e.dynamic.your.domain` will return first  "*ip.ad.dr.ss*", the attacker host IP address, then  "127.0.0.1" for subsequent queries for a limited period of time.
 
 Note: You will need to verify that other services do not listen on ports required by Singularity. 
 
@@ -185,7 +185,7 @@ Singularity has been tested to work in the following browsers:
 | Firefox | iOS | ~1 min |
 
 The above was tested with Singularity's default conservative settings: 
-* DNS rebinding strategy: `DNSRebindFromQueryFirstThenSecond`
+* DNS rebinding strategy: `First then second (default, conservative)`
 * Fetch interval (Web interface): 20s
 * Target: 127.0.0.1.
 
@@ -193,14 +193,14 @@ Much faster attacks can be achieved in certain configurations, as detailed in th
 
 | Browser  | Operating System | Time to Exploit | Rebinding Strategy | Fetch Interval | Target Specification |
 | --- | --- | --- | --- | ---| ---| 
-| Chrome  | Windows 10 | ~3s | `DNSRebindFromQueryMultiA` | 1s | 127.0.0.1 |
-| Edge | Windows 10 |  ~3s | `DNSRebindFromQueryMultiA` | 1s |127.0.0.1 |
-| Firefox | Windows 10 | ~3s | `DNSRebindFromQueryMultiA` | 1s | 127.0.0.1 |
-| Chromium | Ubuntu | ~3s | `DNSRebindFromQueryMultiA` | 1s | 0.0.0.0 |
-| Firefox | Ubuntu | ~3s | `DNSRebindFromQueryMultiA` | 1s | 0.0.0.0 |
-| Chrome | macOS | ~3s | `DNSRebindFromQueryMultiA` | 1s |0.0.0.0 |
-| Firefox | macOS |  ~3s | `DNSRebindFromQueryMultiA` | 1s |0.0.0.0 |
-| Safari | macOS |  ~3s | `DNSRebindFromQueryMultiA` | 1s |0.0.0.0 |
+| Chrome  | Windows 10 | ~3s | `Multiple answers (fast)` | 1s | 127.0.0.1 |
+| Edge | Windows 10 |  ~3s | `Multiple answers (fast)` | 1s |127.0.0.1 |
+| Firefox | Windows 10 | ~3s | `Multiple answers (fast)` | 1s | 127.0.0.1 |
+| Chromium | Ubuntu | ~3s | `Multiple answers (fast)` | 1s | 0.0.0.0 |
+| Firefox | Ubuntu | ~3s | `Multiple answers (fast)` | 1s | 0.0.0.0 |
+| Chrome | macOS | ~3s | `Multiple answers (fast)` | 1s |0.0.0.0 |
+| Firefox | macOS |  ~3s | `Multiple answers (fast)` | 1s |0.0.0.0 |
+| Safari | macOS |  ~3s | `Multiple answers (fast)` | 1s |0.0.0.0 |
 
 We will add more platforms as we test them. We elected a delay of 3s to perform DNS rebinding to cater for targets with a poor connection to the internet/network.
 
@@ -212,27 +212,31 @@ Browse to that port to configure and launch the DNS rebinding attack.
 ### Personalizing The Manager Configuration File
 Singularity comes with a default configuration file in `html/manager-config.json`.
 You can modify this file to change the default parameters, such as the
-`attackHostDomain`, the `attackHostIPAddress`, and the `attackPayloads`.
-You need to edit this file if you add your own payloads.
+`attackHostDomain`, the `attackHostIPAddress`, the `attackPayloads`, the `rebindingStrategy` 
+and the `interval`.
+
+Valid DNS rebinding strategy `"rebindingStrategy"` configuration values and UI correspondance are as follows:
+
+* `"FromQueryFirstThenSecond"`: "First then second (default, conservative)")
+* `"FromQueryMultiA"`: "Multiple answers (fast)"
+* `"FromQueryRoundRobin"`: "Round robin (IPS/filters evasion)"
+* `"FromQueryRandom"`: "Random (IPS/filters evasion)"
+
+The DNS rebinding strategies are explained in a later section.
+
+You need to edit this file if you add your own payloads or would like to automate an attack (covered later in this document).
 You do not need to edit the configuration file if you want to use existing
 payloads as you can change the parameters in the web interface.
 
 ### Server Arguments
 Launch the Singularity binary, (`singularity-server`), with the `-h` parameter to see its parameters.
 
-- `-DNSRebindStrategy string` : 
-  Specify how to respond to DNS queries from a victim client.
-  The supported strategies are:
-  - `DNSRebindFromQueryRoundRobin`
-  - `DNSRebindFromQueryFirstThenSecond` (default)
-  - `DNSRebindFromQueryRandom`
-  - `DNSRebindFromQueryMultiA` (requires Linux `iptables`)
 - `-HTTPServerPort value` : 
   Specify the attacker HTTP Server port that will serve HTML/JavaScript files. 
   Repeat this flag to listen on more than one HTTP port.
 - `-ResponseIPAddr string` : 
   Specify the attacker host IP address that will be rebound to the victim host 
-  address using strategy specified by flag `-DNSRebingStrategy` (default value
+  address (default value
   is 192.168.0.1).
 - `-ResponseReboundIPAddr string` : 
   Specify the victim host IP address that is rebound from the attacker host
@@ -264,6 +268,7 @@ The following table describes all form fields and buttons in the manager interfa
 | Attack Payload | This is where you select the payload, i.e. which application you are trying to exploit. |
 | Start Attack | Start the DNS rebinding attack. Be patient and wait for at least one minute. Open the browser web console to see debugging logs. |
 | Toggle Advanced Options | This button will enable the advanced fields described below. |
+| Rebinding Strategy | Specify how to respond to DNS queries from a victim client. The following options are available:<br /><br /> * `First then second (default, conservative)`: This is the default value<br /> * `Multiple answers`: Near Instant DNS rebinding attack! Ensure to set the interval option below to 1 second and the target address if attacking the local host to "0.0.0.0" for Unix-like platforms (e.g. Linux, macOS) and to "127.0.0.1" or its variants for Microsoft Windows.<br /> * `Round robin (IPS/filters evasion)`: Alternate DNS responses between the attack  and target host IP addresses.<br /> * `Random (IPS/filters evasion)`: Randomly alternate DNS responses between the attack and target host IP addresses. <br /> |
 | Interval | How long to wait between connection attempts to the target application in seconds. Default value: 20 |
 | Index Token | The index token is used by Singularity to detect if the rebinding has happened yet. Default value: `thisismytesttoken` |
 
@@ -308,6 +313,20 @@ Start with copying the content of this file to a new `.html` file and add its na
 to the `attackPayloads` list in the `manager-config.json` file.
 Then modify the new HTML file to change the request URL for example.
 
+### Attacks Automation
+
+Attacks can be automatically delivered by `Singularity of Origin` to a victim by embedding its manager page in a hidden iframe of a "malicious" page (or modifying the manager page to look as desired) and enticing a user or headless browser to visit this page.
+
+First, configure the desired attack settings in the manager configuration file (`manager-config.json`). Then, ensure that the following parameters are passed to the manager file, as appropriate:
+
+* `startattack`: If set to `true`, starts the attack imeediately after the manager page has been loaded.
+* `delaydomload`: If set to `true`, maintains a connection to the headless browser to give time for the DNS rebinding attack to take place. Required for headless browsers.
+* `alert`: If set to `false`, ensure that `Singularity of Origin` JavaScript `alert()` dialog boxes are not displayed.
+
+The following sample URL will automatically start an attack, "hang" the browser while the attack happens, and displays an alert dialog box on success:
+
+http://rebinder.your.domain:80/manager.html?startattack=true&delaydomload=true&alert=true"
+
 ## Preventing DNS Rebinding Attacks
 
 DNS rebinding attacks can be prevented by validating the "Host" HTTP header on
@@ -335,7 +354,7 @@ conditions, such as responding with a localhost CNAME record when targeting an
 application via the Google Chrome browser for instance.
 
 ## Advanced Techniques
-* Use the `-DNSRebindStrategy DNSRebindFromQueryRandom` DNS rebinding strategy instead of the default `- DNSRebindStrategy DNSRebindFromQueryFirstThenSecond` if you suspect the presence of an IDS in one or more environments that sends several DNS requests to the attack server in addition to the actual target. This will ensure that the target will eventually obtain the required IP address, albeit a bit more slowly.
+* Use the `Random (IPS/Filters evasion)` DNS rebinding strategy option in the advanced options of the manager interface instead of the default `First then second (default, conservative)` if you suspect the presence of an IDS in one or more environments that sends several DNS requests to the attack server in addition to the actual target. This will ensure that the target will eventually obtain the required IP address, albeit a bit more slowly.
 * Singularity responds with a DNS CNAME instead of an A record if one specifies "localhost" as the target instead of "127.0.0.1". This works around DNS filtering of responses containing "127.0.0.1" in some configurations. Some browsers appear to perform their own lookup upon reception of a CNAME record containing "localhost". Chrome populates its DNS cache with both "127.0.0.1" and "::1" in particular. Related: https://tools.ietf.org/html/draft-west-let-localhost-be-localhost-06.
 * Similarly, specifying "0.0.0.0" on Mac and Linux, which corresponds to "this host, on any interface" on these platforms may work around some filters/controls.
 
@@ -343,11 +362,11 @@ application via the Google Chrome browser for instance.
  * Cross-platform compilation: go to "~/singularity/cmd/singularity-server/" and type `env GOOS=linux GOARCH=amd64 go build` for a Linux build or `go build` from a mac OS machine for a Mac build.
  * The `fetch` API based attack scripts in the "html" directories will stop after 5 attempts if there are network errors.
  * Going to `chrome://net-internals/#dns` in the Chrome browser is great for debugging.
- * Test `dig` query: `dig "s-ip.ad.dr.ss-127.0.0.1-<random_number>--e.dynamic.your.domain" @ip.ad.dr.ss`
+ * Test `dig` query: `dig "s-ip.ad.dr.ss-127.0.0.1-<random_number>-fromqueryfirstthensecond-e.dynamic.your.domain" @ip.ad.dr.ss`
  * `sudo ./singularity-server -HTTPServerPort 8080 -HTTPServerPort 8081  -dangerouslyAllowDynamicHTTPServers` starts a server on port 8080 and 8081 and enables requesting dynamically one additional HTTP port via the Manager interface.
  * Testing a service for a DNS rebinding vulnerability: In an HTTP intercepting proxy such as Portswigger's Burp Suite, replay a request to `localhost`, replacing the host header value e.g. "localhost" with "attacker.com". If the request is accepted, chances are that you have found a DNS rebinding vulnerability. What you can do after, the impact, depends on the vulnerable application.
- * Use the `DNSRebindFromQueryMultiA` strategy for instant rebinding when supported by the target browser/OS combination and with the tested settings, summarized in the table above.
- * The `DNSRebindFromQueryMultiA` rebinding strategy does not support the "localhost" target value if trying to evade IPS/IDS and DNS filters.
+ * Use the `Multiple answers (fast)` DNS rebinding strategy option in the advanced options of the manager interface for instant rebinding when supported by the target browser/OS combination and with the tested settings, summarized in the table above.  This strategy requires Linux `iptables` on the attacker host.
+ * The `Multiple answers (fast)` rebinding strategy does not support the "localhost" target value if trying to evade IPS/IDS and DNS filters.
 
 
 ## Contributing
