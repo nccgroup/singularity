@@ -215,14 +215,14 @@ You can modify this file to change the default parameters, such as the
 `attackHostDomain`, the `attackHostIPAddress`, the `attackPayloads`, the `rebindingStrategy` 
 and the `interval`.
 
-Valid DNS rebinding strategy `"rebindingStrategy"` configuration values and UI correspondance are as follows:
+Valid DNS rebinding strategy `"rebindingStrategy"` configuration file values and corresponding Manager interface values are as follows:
 
-* `"FromQueryFirstThenSecond"`: "First then second (default, conservative)")
+* `"FromQueryFirstThenSecond"`: "First then second (default, conservative)"
 * `"FromQueryMultiA"`: "Multiple answers (fast)"
 * `"FromQueryRoundRobin"`: "Round robin (IPS/filters evasion)"
-* `"FromQueryRandom"`: "Random (IPS/filters evasion)"
+* `"FromQueryRandom"`: "Random (IPS/filters evasion)".
 
-The DNS rebinding strategies are explained in a later section.
+These DNS rebinding strategies are explained in a later section.
 
 You need to edit this file if you add your own payloads or would like to automate an attack (covered later in this document).
 You do not need to edit the configuration file if you want to use existing
@@ -268,9 +268,9 @@ The following table describes all form fields and buttons in the manager interfa
 | Attack Payload | This is where you select the payload, i.e. which application you are trying to exploit. |
 | Start Attack | Start the DNS rebinding attack. Be patient and wait for at least one minute. Open the browser web console to see debugging logs. |
 | Toggle Advanced Options | This button will enable the advanced fields described below. |
-| Rebinding Strategy | Specify how to respond to DNS queries from a victim client. The following options are available:<br /><br /> * `First then second (default, conservative)`: This is the default value<br /> * `Multiple answers`: Near Instant DNS rebinding attack! Ensure to set the interval option below to 1 second and the target address if attacking the local host to "0.0.0.0" for Unix-like platforms (e.g. Linux, macOS) and to "127.0.0.1" or its variants for Microsoft Windows.<br /> * `Round robin (IPS/filters evasion)`: Alternate DNS responses between the attack  and target host IP addresses.<br /> * `Random (IPS/filters evasion)`: Randomly alternate DNS responses between the attack and target host IP addresses. <br /> |
+| Rebinding Strategy | Specify how to respond to DNS queries from a victim client. The following options are available:<br /><br /> * `First then second (default, conservative)`: This is the default value.<br /> * `Multiple answers`: Near instant DNS rebinding attack! Ensure to set the interval option below to 1 second and the target address if attacking the local host to "0.0.0.0" for Unix-like platforms (e.g. Linux, macOS) and to "127.0.0.1" or its variants for Microsoft Windows.<br /> * `Round robin (IPS/filters evasion)`: Alternate DNS responses between the attack  and target host IP addresses.<br /> * `Random (IPS/filters evasion)`: Randomly alternate DNS responses between the attack and target host IP addresses. <br /> |
 | Interval | How long to wait between connection attempts to the target application in seconds. Default value: 20 |
-| Index Token | The index token is used by Singularity to detect if the rebinding has happened yet. Default value: `thisismytesttoken` |
+| Index Token | The index token is used by Singularity to detect if the rebinding has happened yet. Default value: `thisismytesttoken`. |
 
 ### Payloads Description
 Singularity supports the following attack payloads:
