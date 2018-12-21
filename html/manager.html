@@ -112,14 +112,14 @@
 
                 <div class="form-group row">
                     <div class="col-2">
-                        <label for="rebindingstrategy">Rebinding Strategy</label>
+                        <label for="rebindingStrategy">Rebinding Strategy</label>
                     </div>
                     <div class="col-3">
-                        <select id="rebindingstrategies" class="rebindingstrategies-dropdown-content">
-                            <option value="FromQueryFirstThenSecond">First then second (default, conservative)</option>
-                            <option value="FromQueryMultiA">Multiple answers (fast)</option>
-                            <option value="FromQueryRoundRobin">Round Robin (IPS/filters evasion)</option>
-                            <option value="FromQueryRandom">Random (IPS/filters evasion)</option>
+                        <select id="rebindingStrategy" class="rebindingstrategy-dropdown-content">
+                            <option id="FromQueryFirstThenSecond" value="FromQueryFirstThenSecond">First then second (default, conservative)</option>
+                            <option id="FromQueryMultiA" value="FromQueryMultiA">Multiple answers (fast)</option>
+                            <option id="FromQueryRoundRobin" value="FromQueryRoundRobin">Round Robin (IPS/filters evasion)</option>
+                            <option id="FromQueryRandom" value="FromQueryRandom">Random (IPS/filters evasion)</option>
                         </select>
                     </div>
                     <div class="col-7">

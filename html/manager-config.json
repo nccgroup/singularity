@@ -4,6 +4,7 @@
     "targetHostIPAddress": "127.0.0.1",
     "dummyPort": 4000,
     "interval": 20,
+    "rebindingStrategy": "FromQueryFirstThenSecond",
     "indexToken": "thisismytesttoken",
     "attackPayloads": [{
         "name": "payload-simple-fetch-get.html",
