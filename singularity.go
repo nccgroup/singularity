@@ -19,6 +19,14 @@ import (
 
 /*** General Stuff ***/
 
+//DNSRebindingStrategy maps a DNS Rebinding strategy name to a function
+var DNSRebindingStrategy = map[string]func(session string, dcss *DNSClientStateStore, q dns.Question) []string{
+	"fromqueryroundrobin":      DNSRebindFromQueryRoundRobin,
+	"fromqueryfirstthensecond": DNSRebindFromQueryFirstThenSecond,
+	"fromqueryrandom":          DNSRebindFromQueryRandom,
+	"fromquerymultia":          DNSRebindFromQueryMultiA,
+}
+
 // DNSClientStateStore stores DNS sessions
 // It permits to respond to multiple clients
 // based on their current DNS rebinding state.
@@ -74,6 +82,7 @@ type DNSQuery struct {
 	ResponseIPAddr        string
 	ResponseReboundIPAddr string
 	Session               string
+	DNSRebindingStrategy  string
 	DNSCacheFlush         bool
 	Domain                string
 }
@@ -131,9 +140,12 @@ func NewDNSQuery(qname string) (*DNSQuery, error) {
 
 	}
 
-	if len(elements[3]) != 0 {
+	/*if len(elements[3]) != 0 {
 		name.DNSCacheFlush = true
 	}
+	*/
+
+	name.DNSRebindingStrategy = elements[3]
 
 	name.Domain = fmt.Sprintf(".%v", domainSuffix)
 
@@ -160,7 +172,7 @@ func DNSRebindFromQueryFirstThenSecond(session string, dcss *DNSClientStateStore
 	elapsed := dcss.Sessions[session].CurrentQueryTime.Sub(dcss.Sessions[session].LastQueryTime)
 	timeOut := dcss.Sessions[session].ResponseReboundIPAddrtimeOut
 
-	log.Printf("In DNSRebindFromQueryFirstThenSecond\n")
+	log.Printf("DNS: in DNSRebindFromQueryFirstThenSecond\n")
 
 	if dnsCacheFlush == false { // This is not a request for cache eviction
 		if elapsed < (time.Second * time.Duration(timeOut)) {
@@ -181,7 +193,7 @@ func DNSRebindFromQueryRandom(session string, dcss *DNSClientStateStore, q dns.Q
 	hosts := []string{dcss.Sessions[session].ResponseIPAddr, dcss.Sessions[session].ResponseReboundIPAddr}
 	dcss.RUnlock()
 
-	log.Printf("In DNSRebindFromQueryRandom\n")
+	log.Printf("DNS: in DNSRebindFromQueryRandom\n")
 
 	if dnsCacheFlush == false { // This is not a request for cache eviction
 		answers[0] = hosts[rand.Intn(len(hosts))]
@@ -202,7 +214,7 @@ func DNSRebindFromQueryRoundRobin(session string, dcss *DNSClientStateStore, q d
 	LastResponseReboundIPAddr := dcss.Sessions[session].LastResponseReboundIPAddr
 	dcss.RUnlock()
 
-	log.Printf("In DNSRebindFromQueryRoundRobin\n")
+	log.Printf("DNS: in DNSRebindFromQueryRoundRobin\n")
 
 	if dnsCacheFlush == false { // This is not a request for cache eviction
 		hosts := []string{"", ResponseIPAddr, ResponseReboundIPAddr}
@@ -230,6 +242,7 @@ func DNSRebindFromQueryMultiA(session string, dcss *DNSClientStateStore, q dns.Q
 	dcss.RLock()
 	answers := []string{dcss.Sessions[session].ResponseIPAddr, dcss.Sessions[session].ResponseReboundIPAddr}
 	dcss.RUnlock()
+	log.Printf("DNS: in DNSRebindFromQueryMultiA\n")
 	return answers
 }
 
@@ -252,7 +265,7 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 			for _, q := range m.Question {
 				switch q.Qtype {
 				case dns.TypeA:
-					log.Printf("Received A query: %v\n", q.Name)
+					log.Printf("DNS: Received A query: %v from: %v\n", q.Name, w.RemoteAddr().String())
 
 					// Preparing to update the client DNS query state
 					clientState.CurrentQueryTime = now
@@ -261,7 +274,7 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 
 					var err error
 					name, err = NewDNSQuery(q.Name)
-					log.Printf("Parsed query: %v, error: %v\n", name, err)
+					log.Printf("DNS: Parsed query: %v, error: %v\n", name, err)
 
 					if err != nil {
 						// We could not parse the query, set default response settings
@@ -273,10 +286,13 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 						clientState.ResponseIPAddr = name.ResponseIPAddr
 						clientState.ResponseReboundIPAddr = name.ResponseReboundIPAddr
 						clientState.DNSCacheFlush = name.DNSCacheFlush
+						if fn, ok := DNSRebindingStrategy[name.DNSRebindingStrategy]; ok {
+							rebindingFn = fn
+						}
 					}
 
 					_, keyExists := dcss.Sessions[name.Session]
-					log.Printf("Session exists: %v\n", keyExists)
+					log.Printf("DNS: session exists: %v\n", keyExists)
 
 					dcss.Lock()
 					if keyExists != true {
@@ -320,7 +336,7 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 						rr, err := dns.NewRR(resp)
 						if err == nil {
 							m.Answer = append(m.Answer, rr)
-							log.Printf("Response: %v\n", resp)
+							log.Printf("DNS: response: %v\n", resp)
 						}
 					}
 				}
@@ -379,6 +395,9 @@ func (d *DefaultHeadersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 // HTTP Handler for /servers
 func (hss *HTTPServerStoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+	log.Printf("HTTP: %v %v from %v", r.Method, r.RequestURI, r.RemoteAddr)
+
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	serverInfo := httpServerInfo{}
@@ -476,21 +495,22 @@ func (hss *HTTPServerStoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 }
 
 func (ipt *IPTablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Printf("HTTP: %v %v from %v", r.Method, r.RequestURI, r.RemoteAddr)
 
 	hj, ok := w.(http.Hijacker)
 	if !ok {
-		log.Printf("webserver doesn't support hijacking\n")
+		log.Printf("HTTP: webserver doesn't support hijacking\n")
 		return
 	}
 	conn, bufrw, err := hj.Hijack()
 	if err != nil {
-		log.Printf("could not hijack http server connection: %v\n", err.Error())
+		log.Printf("HTTP: could not hijack http server connection: %v\n", err.Error())
 		return
 	}
 
 	defer conn.Close()
 
-	log.Printf("implementing firewall rule for %v\n", conn.RemoteAddr())
+	log.Printf("HTTP: implementing firewall rule for %v\n", conn.RemoteAddr())
 	dst := strings.Split(conn.LocalAddr().String(), ":")
 	src := strings.Split(conn.RemoteAddr().String(), ":")
 	srcAddr := src[0]
@@ -521,14 +541,15 @@ func (ipt *IPTablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type DelayDOMLoadHandler struct{}
 
 func (h *DelayDOMLoadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Printf("HTTP: %v %v from %v", r.Method, r.RequestURI, r.RemoteAddr)
 	hj, ok := w.(http.Hijacker)
 	if !ok {
-		log.Printf("webserver doesn't support hijacking\n")
+		log.Printf("HTTP: webserver doesn't support hijacking\n")
 		return
 	}
 	conn, bufrw, err := hj.Hijack()
 	if err != nil {
-		log.Printf("could not hijack http server connection: %v\n", err.Error())
+		log.Printf("HTTP: could not hijack http server connection: %v\n", err.Error())
 		return
 	}
 
@@ -561,19 +582,21 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 		// In the singularity manager interface,
 		// we need to ensure that the polling interval is fast, e.g. 1 sec.
 
+		log.Printf("HTTP: %v %v from %v", req.Method, req.RequestURI, req.RemoteAddr)
+
 		name, err := NewDNSQuery(req.Host)
 		if err == nil {
 
 			dcss.RLock()
 			dnsCacheFlush := dcss.Sessions[name.Session].DNSCacheFlush
 			elapsed := time.Now().Sub(dcss.Sessions[name.Session].CurrentQueryTime)
-			rebindingStrategy := dcss.RebindingStrategy
+			//rebindingStrategy := dcss.RebindingStrategy
 			dcss.RUnlock()
 
-			if rebindingStrategy == "DNSRebindFromQueryMultiA" {
+			if name.DNSRebindingStrategy == "fromquerymultia" {
 				if dnsCacheFlush == false { // This is not a request for cache eviction
 					if elapsed > (time.Second * time.Duration(3)) {
-						log.Printf("Attempting Multiple A records rebinding for: %v", name)
+						log.Printf("HTTP: attempting Multiple A records rebinding for: %v", name)
 						ipth.ServeHTTP(w, req)
 						return
 					}
@@ -633,7 +656,7 @@ func StartHTTPServer(s *http.Server, hss *HTTPServerStoreHandler, dynamic bool) 
 	hss.Unlock()
 
 	go func() {
-		log.Printf("Starting HTTP Server on %v\n", s.Addr)
+		log.Printf("HTTP: starting HTTP Server on %v\n", s.Addr)
 		routineErr := s.Serve(l)
 		hss.Errc <- HTTPServerError{Err: routineErr, Port: s.Addr}
 	}()
@@ -644,6 +667,6 @@ func StartHTTPServer(s *http.Server, hss *HTTPServerStoreHandler, dynamic bool) 
 
 // StopHTTPServer stops an HTTP server
 func StopHTTPServer(s *http.Server, hss *HTTPServerStoreHandler) {
-	log.Printf("Stopping HTTP Server on %v\n", s.Addr)
+	log.Printf("HTTP: stopping HTTP Server on %v\n", s.Addr)
 	s.Close()
 }

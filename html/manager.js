@@ -15,7 +15,7 @@ runningConfig.automatic = getParameterByName("startattack");
 // to delay the browser DOM load event
 // and prevent premature exit of headless browsers
 runningConfig.delayDOMLoad = getParameterByName("delaydomload");
-// Set URL parameter `alertsucess` to "false"
+// Set URL parameter `alertsuccess` to "false"
 // to not present an alert box upon a successful rebinding attack.
 // This may be useful for:
 // * not informing a victim that an attack completed
@@ -94,7 +94,7 @@ function reloadAttackFrameOne() {
         .replace("%1", document.getElementById("attackhostipaddress").value)
         .replace("%2", document.getElementById("targethostipaddress").value)
         .replace("%3", Math.floor(Math.random() * Math.floor(Number.MAX_SAFE_INTEGER)))
-        .replace("%4", "")
+        .replace("%4", document.getElementById("rebindingStrategy").value)
         .replace("%5", document.getElementById("attackhostdomain").value)
         .replace("%6", document.getElementById("targetport").value)
         .replace("%7", document.getElementById("payloads").value) +
@@ -212,7 +212,7 @@ function getParameterByName(name, url) {
 /* UI Stuff */
 
 // Obtain payloads and target specs from manager-config.json
-function getPayloads() {
+function getManagerConfig() {
     payloadsElement = document.getElementById('payloads');
     let result = fetch('/manager-config.json')
         .then(function (r) {
@@ -236,6 +236,7 @@ function getPayloads() {
             document.getElementById('dummyport').value = config.dummyPort;
             document.getElementById('indextoken').value = config.indexToken;
             document.getElementById('interval').value = config.interval;
+            document.getElementById(config.rebindingStrategy).selected = true;
         })
     return result;
 }
@@ -249,7 +250,7 @@ document.addEventListener("DOMContentLoaded", function (event) {
         document.getElementById("requestport").disabled = !HTTPServersConfig.AllowDynamicHTTPServers;
     });
 
-    let payloadsAndTargets = getPayloads();
+    let payloadsAndTargets = getManagerConfig();
 
     // Once we have our HTTP servers config, payloads and targets
     Promise.all([HTTPServersConfig, payloadsAndTargets]).then(function (values) {
