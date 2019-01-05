@@ -211,11 +211,9 @@ Browse to that port to configure and launch the DNS rebinding attack.
 
 ### Personalizing The Manager Configuration File
 Singularity comes with a default configuration file in `html/manager-config.json`.
-You can modify this file to change the default parameters, such as the
-`attackHostDomain`, the `attackHostIPAddress`, the `attackPayloads`, the `rebindingStrategy` 
-and the `interval`.
+You can modify this file to change the default parameters, such as  `attackHostDomain`, `attackHostIPAddress` `attackPayloads`, `rebindingStrategy` and `interval`.
 
-Valid DNS rebinding strategy `"rebindingStrategy"` configuration file values and corresponding Manager interface values are as follows:
+Valid DNS rebinding strategy (`"rebindingStrategy"` setting) configuration file values and their corresponding Singularity manager web interface values are as follows:
 
 * `"FromQueryFirstThenSecond"`: "First then second (default, conservative)"
 * `"FromQueryMultiA"`: "Multiple answers (fast)"
@@ -268,7 +266,7 @@ The following table describes all form fields and buttons in the manager interfa
 | Attack Payload | This is where you select the payload, i.e. which application you are trying to exploit. |
 | Start Attack | Start the DNS rebinding attack. Be patient and wait for at least one minute. Open the browser web console to see debugging logs. |
 | Toggle Advanced Options | This button will enable the advanced fields described below. |
-| Rebinding Strategy | Specify how to respond to DNS queries from a victim client. The following options are available:<br /><br /> * `First then second (default, conservative)`: This is the default value.<br /> * `Multiple answers`: Near instant DNS rebinding attack! Ensure to set the interval option below to 1 second and the target address if attacking the local host to "0.0.0.0" for Unix-like platforms (e.g. Linux, macOS) and to "127.0.0.1" or its variants for Microsoft Windows.<br /> * `Round robin (IPS/filters evasion)`: Alternate DNS responses between the attack  and target host IP addresses.<br /> * `Random (IPS/filters evasion)`: Randomly alternate DNS responses between the attack and target host IP addresses. <br /> |
+| Rebinding Strategy | Specify how to respond to DNS queries from a victim client. The following options are available:<br /><br /> * `First then second (default, conservative)`: This is the default value. It should work on most if not all platforms in 40 to 60 seconds. <br /> * `Multiple answers`: Near instant DNS rebinding attack! Make sure to set the interval option described below to 1 second and the target address if attacking the local host to "0.0.0.0" for Unix-like platforms (e.g. Linux, macOS) and to "127.0.0.1" (or any other valid local host addresses) for Microsoft Windows.<br /> * `Round robin (IPS/filters evasion)`: Alternate DNS responses between the attack  and target host IP addresses.<br /> * `Random (IPS/filters evasion)`: Randomly alternate DNS responses between the attack and target host IP addresses. <br /> |
 | Interval | How long to wait between connection attempts to the target application in seconds. Default value: 20 |
 | Index Token | The index token is used by Singularity to detect if the rebinding has happened yet. Default value: `thisismytesttoken`. |
 
@@ -313,11 +311,11 @@ Start with copying the content of this file to a new `.html` file and add its na
 to the `attackPayloads` list in the `manager-config.json` file.
 Then modify the new HTML file to change the request URL for example.
 
-### Attacks Automation
+### Attack Automation
 
 Attacks can be automatically delivered by `Singularity of Origin` to a victim by embedding its manager page in a hidden iframe of a "malicious" page (or modifying the manager page to look as desired) and enticing a user or headless browser to visit this page.
 
-First, configure the desired attack settings in the manager configuration file (`manager-config.json`). Then, ensure that the following parameters are passed to the manager file, as appropriate:
+First, configure the desired attack settings in the manager configuration file (`manager-config.json`). Then, ensure that the following parameters are passed in the Singularity manager interface URL, as appropriate:
 
 * `startattack`: If set to `true`, starts the attack imeediately after the manager page has been loaded.
 * `delaydomload`: If set to `true`, maintains a connection to the headless browser to give time for the DNS rebinding attack to take place. Required for headless browsers.
