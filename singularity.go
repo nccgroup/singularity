@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -447,13 +446,17 @@ func (hss *HTTPServerStoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 			return
 		}
 
-		body, err := ioutil.ReadAll(io.LimitReader(r.Body, 5000))
+		r.Body = http.MaxBytesReader(w, r.Body, 5000)
+
+		body, err := ioutil.ReadAll(r.Body)
+
 		if err != nil {
 			http.Error(w, emptyResponseStr, 400)
 			return
 		}
 
 		err = json.Unmarshal(body, &serverInfo)
+
 		if err != nil {
 			http.Error(w, emptyResponseStr, 400)
 			return
