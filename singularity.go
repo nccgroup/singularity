@@ -90,8 +90,14 @@ type DNSQuery struct {
 
 // NewDNSQuery parses DNS query string
 // and returns a DNSQuery structure.
+// "-" is used a field delimitor in query string
+// if target contains a CNAME instead of an IP address
+// and if CNAME includes any "-",
+// then each of these "-" must be escaped with another "-"
 func NewDNSQuery(qname string) (*DNSQuery, error) {
 	name := new(DNSQuery)
+
+	qname = strings.Replace(qname, "--", "_", -1)
 
 	split := strings.Split(qname, "-e.")
 
@@ -127,6 +133,7 @@ func NewDNSQuery(qname string) (*DNSQuery, error) {
 
 	if elements[1] != "localhost" {
 
+		elements[1] = strings.Replace(elements[1], "_", "-", -1)
 		if net.ParseIP(elements[1]) == nil && golang.IsDomainName(elements[1]) == false {
 			return name, errors.New("cannot parse IP address or CNAME of second host in DNS query")
 		}

@@ -317,7 +317,7 @@ Attacks can be automatically delivered by `Singularity of Origin` to a victim by
 
 First, configure the desired attack settings in the manager configuration file (`manager-config.json`). Then, ensure that the following parameters are passed in the Singularity manager interface URL, as appropriate:
 
-* `startattack`: If set to `true`, starts the attack imeediately after the manager page has been loaded.
+* `startattack`: If set to `true`, starts the attack immediately after the manager page has been loaded.
 * `delaydomload`: If set to `true`, maintains a connection to the headless browser to give time for the DNS rebinding attack to take place. Required for headless browsers.
 * `alert`: If set to `false`, ensure that `Singularity of Origin` JavaScript `alert()` dialog boxes are not displayed.
 
