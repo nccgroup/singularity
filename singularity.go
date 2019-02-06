@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/nccgroup/singularity/golang"
 )
 
 /*** General Stuff ***/
@@ -126,11 +127,11 @@ func NewDNSQuery(qname string) (*DNSQuery, error) {
 
 	if elements[1] != "localhost" {
 
-		if net.ParseIP(elements[1]) == nil {
-			return name, errors.New("cannot parse IP address of second host in DNS query")
-
+		if net.ParseIP(elements[1]) == nil && golang.IsDomainName(elements[1]) == false {
+			return name, errors.New("cannot parse IP address or CNAME of second host in DNS query")
 		}
 	}
+
 	name.ResponseReboundIPAddr = elements[1]
 
 	name.Session = elements[2]
@@ -310,20 +311,21 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 
 					response := []string{}
 
-					if len(answers) == 1 { //we return only one answer
-
-						if answers[0] == "localhost" { //we respond with a CNAME record
-
-							response = append(response, fmt.Sprintf("%s 10 IN CNAME %s.", q.Name, answers[0]))
-
-						} else { // We respond with a A record
-							response = append(response, fmt.Sprintf("%s 0 IN A %s", q.Name, answers[0]))
-
+					respond := func(question string, answer string) string {
+						// we respond with one A record
+						response := fmt.Sprintf("%s 0 IN A %s", question, answer)
+						//otherwise we respond with a CNAME record if we do not have an IP address
+						if net.ParseIP(answer) == nil {
+							response = fmt.Sprintf("%s 10 IN CNAME %s.", question, answer)
 						}
-					} else { // We respond multiple answers
-						response = append(response, fmt.Sprintf("%s 10 IN A %s", q.Name, answers[0]))
-						response = append(response, fmt.Sprintf("%s 10 IN A %s", q.Name, answers[1]))
+						return response
+					}
 
+					if len(answers) == 1 { //we return only one answer
+						response = append(response, respond(q.Name, answers[0]))
+					} else { // We respond with multiple answers
+						response = append(response, fmt.Sprintf("%s 10 IN A %s", q.Name, answers[0]))
+						response = append(response, respond(q.Name, answers[1]))
 					}
 
 					dcss.Lock()
@@ -446,17 +448,13 @@ func (hss *HTTPServerStoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 			return
 		}
 
-		r.Body = http.MaxBytesReader(w, r.Body, 5000)
-
 		body, err := ioutil.ReadAll(r.Body)
-
 		if err != nil {
 			http.Error(w, emptyResponseStr, 400)
 			return
 		}
 
 		err = json.Unmarshal(body, &serverInfo)
-
 		if err != nil {
 			http.Error(w, emptyResponseStr, 400)
 			return
