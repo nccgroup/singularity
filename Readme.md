@@ -54,7 +54,7 @@ It is also possible to trigger DNS rebinding before a cached DNS record expires,
 * A number of technical controls to maximize the reliability and speed of attacks:
   * Disabling HTTP keep alive, caching, DNS prefetching
   * Aggressive DNS response TTLs
-  * Option to use DNS CNAME instead of A records to evade several DNS filtering solutions
+  * Option to use DNS CNAME instead of A records to evade several DNS filtering solutions or to target internal resources for which the DNS A record is unknown.
   * Near instant rebinding for several browser and OS combinations, using multiple DNS answers and dynamic HTTP port blocking.
 * Ability to allocate HTTP servers at startup or dynamically thereafter
   * A convenience feature to avoid restarting Singularity to listen on a different HTTP port.
@@ -260,7 +260,7 @@ The following table describes all form fields and buttons in the manager interfa
 | --- | --- |
 | Attack Host Domain | This is the (sub-)domain where the Singularity web server is running. Default value: `dynamic.rebind.it` |
 | Attack Host | This is the IP address where the manager and the attack payloads are hosted. Default value: xxx.xxx.xxx.xxx |
-| Target Host | This is the IP address of the target system where the victim (target) application is running. Default value: 127.0.0.1 |
+| Target Host | This is the IP address or FQDN (e.g. jenkins.internal.target.com) of the target system where the victim (target) application is running. Default value: 127.0.0.1 |
 | Target Port | This is the port where the victim (target) application is listening on. Default value: 8080 |
 | Request New Port | This will request Singularity to listen on a new port. This feature is only available when Singularity has been started with the `-dangerouslyAllowDynamicHTTPServers` command line option. |
 | Attack Payload | This is where you select the payload, i.e. which application you are trying to exploit. |
