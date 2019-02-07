@@ -92,7 +92,7 @@ window.addEventListener("message", function (msg) {
 function reloadAttackFrameOne() {
     document.getElementById("attackframeone").src = hosturl
         .replace("%1", document.getElementById("attackhostipaddress").value)
-        .replace("%2", document.getElementById("targethostipaddress").value)
+        .replace("%2", document.getElementById("targethostipaddress").value.replace(/-/g, '--'))
         .replace("%3", Math.floor(Math.random() * Math.floor(Number.MAX_SAFE_INTEGER)))
         .replace("%4", document.getElementById("rebindingStrategy").value)
         .replace("%5", document.getElementById("attackhostdomain").value)
@@ -184,7 +184,7 @@ function forceCacheEviction() {
     for (i = 0; i < 1000; i++) {
         url = hosturl
             .replace("%1", document.getElementById("attackhostipaddress").value)
-            .replace("%2", document.getElementById("targethostipaddress").value)
+            .replace("%2", document.getElementById("targethostipaddress").value.replace(/-/g, '--'))
             .replace("%3", "none")
             .replace("%4", "cacheeviction" + (Number(0x0 + i).toString(16)))
             .replace("%5", document.getElementById("attackhostdomain").value)
