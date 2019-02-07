@@ -54,7 +54,7 @@ It is also possible to trigger DNS rebinding before a cached DNS record expires,
 * A number of technical controls to maximize the reliability and speed of attacks:
   * Disabling HTTP keep alive, caching, DNS prefetching
   * Aggressive DNS response TTLs
-  * Option to use DNS CNAME instead of A records to evade several DNS filtering solutions or to target internal resources for which the DNS A record is unknown.
+  * Option to use DNS CNAME instead of A records to evade several DNS filtering solutions or to target internal resources for which the IP address is unknown.
   * Near instant rebinding for several browser and OS combinations, using multiple DNS answers and dynamic HTTP port blocking.
 * Ability to allocate HTTP servers at startup or dynamically thereafter
   * A convenience feature to avoid restarting Singularity to listen on a different HTTP port.
