@@ -29,7 +29,7 @@ document.onreadystatechange = function () {
     }
 };
 
-const Frame = (id, url)  => {
+const Frame = (id, url) => {
     let fmid = id;
     let fmurl = url;
     let timer = null;
@@ -55,36 +55,52 @@ const Frame = (id, url)  => {
 const FrameManager = () => {
     let nextFrameIdVal = 0;
     let frames = new Map();
+    let origins = new Map();
     const nextFrameId = () => {
         return nextFrameIdVal++;
     };
-     return {
-         addFrame(url) {
-             frameId = `frame-${nextFrameId().toString()}`;
-             frames.set(frameId, Frame(frameId, url));
-         },
-         removeFrame(frameId) {
-            return frames.delete(frameId);
-         },
-         updateFrame(frameId, url) {
+    const origin = (url) => {
+        const u = new URL(url);
+        return `${u.protocol}//${u.hostname}:${u.port}`
+    };
+    return {
+        addFrame(url) {
+            const frameId = `frame-${nextFrameId().toString()}`;
             frames.set(frameId, Frame(frameId, url));
-         },
-         frames() {
-             return frames;
-         },
-         lastFrameId() {
-             return nextFrameIdVal === 0 ? null : `frame-${nextFrameIdVal - 1}`;
-         },
-         frame(id) {
-             return frames.get(id);
-         }
-     }
+            origins.set(origin(url),frameId);
+            return frameId;
+        },
+        removeFrame(frameId) {
+            const url = frames.get(frameId).getURL();
+            origins.delete(origin(url));
+            return frames.delete(frameId);
+        },
+        updateFrame(frameId, url) {
+            const oldurl = frames.get(frameId).getURL();
+            const neworign = orign(url)
+            origins.delete(origin(oldurl));
+            origins.set(neworigin,frameId);
+            frames.set(frameId, Frame(frameId, url));
+        },
+        frames() {
+            return frames;
+        },
+        lastFrameId() {
+            return nextFrameIdVal === 0 ? null : `frame-${nextFrameIdVal - 1}`;
+        },
+        frame(id) {
+            return frames.get(id);
+        },
+        getFrameOrigin(origin) {
+            return origins.get(origin);
+        }
+    }
 };
 
 let fm = FrameManager();
 
 function addFrameToDOM(frame) {
-    let f = document.createElement("iframe"); 
+    let f = document.createElement("iframe");
     f.src = frame.getURL();
     f.setAttribute('id', frame.getId());
     document.getElementById("attackframes").appendChild(f)
@@ -104,12 +120,15 @@ window.addEventListener("message", receiveMessage, false);
 function receiveMessage(msg) {
     console.log("Message received from: ", msg.origin, msg.data.status);
 
-    if (msg.origin !== document.getElementById(fm.lastFrameId()).src.substr(0, msg.origin.length))
+
+    const fid = fm.getFrameOrigin(msg.origin)
+    // If we don't have a frame ID for this message origin, dismiss message.
+    if (fid === undefined ){
         return;
+    };
 
     if (msg.data.status == "start") {
         console.log("Iframe reports that attack has started");
-        let fid = fm.lastFrameId();
         clearInterval(fm.frame(fid).getTimer());
         msg.source.postMessage({
             cmd: "interval",
@@ -138,27 +157,23 @@ function receiveMessage(msg) {
         if (runningConfig.alertSuccess !== "false") {
             alert("Attack Successful: " + document.domain + " " + msg.data.response);
         }
-    }
+    };
 
     // Possibly a firewalled or closed port. Possibly a non-HTTP service.
-    if (msg.data.status == "error") {
+    if (msg.data.status === "error") {
         errorCount += 1;
         console.log("error");
 
         if (errorCount == 5) {
-            let fid = fm.lastFrameId();
-            fid.contentWindow.postMessage({
+            document.getElementById(fid).contentWindow.postMessage({
                 cmd: "stop"
             }, "*");
-            delaydomloadframe.src = "about:blank";
+            //delaydomloadframe.src = "about:blank";
             alert("Too many errors");
         }
     }
 
 };
-
-
-
 
 // Checks payload exists.
 function checkPayload() {
@@ -178,7 +193,7 @@ function begin() {
         return;
     }
 
-    fm.addFrame(hosturl
+    let fid = fm.addFrame(hosturl
         .replace("%1", document.getElementById("attackhostipaddress").value)
         .replace("%2", document.getElementById("targethostipaddress").value.replace(/-/g, '--'))
         .replace("%3", Math.floor(Math.random() * Math.floor(Number.MAX_SAFE_INTEGER)))
@@ -186,16 +201,18 @@ function begin() {
         .replace("%5", document.getElementById("attackhostdomain").value)
         .replace("%6", document.getElementById("targetport").value)
         .replace("%7", document.getElementById("payloads").value));
-        let fid = fm.lastFrameId();
-        addFrameToDOM(fm.frame(fid));
+
+    addFrameToDOM(fm.frame(fid));
 
     message.className = "d-block";
     start.disabled = true;
     errorCount = 0;
-    fm.frame(fid).setTimer(setInterval((() => {reloadAttackFrame(fm.frame(fid))}), parseInt(document.getElementById("interval").value) * 1000));
+   
+    fm.frame(fid).setTimer(setInterval((() => {
+        reloadAttackFrame(fm.frame(fid))
+    }), parseInt(document.getElementById("interval").value) * 1000));
+    
     reloadAttackFrame(fm.frame(fid));
-
-
 }
 
 // Toggles display of advanced settings.
