@@ -80,7 +80,7 @@ and any other relevant information. Sample configuration:
                         console.log("frame " + window.location.hostname + " could not load");
                         window.parent.postMessage({
                             status: "error"
-                        }, "*")
+                        }, "*");
                     } else if (error.message == 'hastoken') {
                         console.log('DNS rebinding did not happen yet')
                     } else if (error.message == 'nodata') {
@@ -91,6 +91,9 @@ and any other relevant information. Sample configuration:
                             " ms")
                     } else { // We did not handle something
                         console.log('Unhandled error: ' + error);
+                        window.parent.postMessage({
+                            status: "error",
+                        }, "*");
                     }
                 })
         }

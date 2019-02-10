@@ -35,7 +35,7 @@ The default API port for etcd is TCP 2379 (localhost:2379).
 					console.log("frame " + window.location.hostname + " could not load");
 					window.parent.postMessage({
 						status: "error",
-					}, "*")
+					}, "*");
 				} else if (error.message == 'hastoken') {
 					console.log('DNS rebinding did not happen yet')
 				} else if (error.message == '404') { // We received a 404
@@ -44,6 +44,9 @@ The default API port for etcd is TCP 2379 (localhost:2379).
 						" ms")
 				} else { // We did not handle something
 					console.log('Unhandled error: ' + error);
+					window.parent.postMessage({
+                            status: "error",
+                        }, "*");;
 				}
 			});
 		}

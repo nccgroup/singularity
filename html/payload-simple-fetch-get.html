@@ -45,6 +45,9 @@ function attack() {
 					" ms")
 			} else { // We did not handle something
 				console.log('Unhandled error: ' + error);
+				window.parent.postMessage({
+					status: "error",
+				}, "*");
 			}
 		});
 }

@@ -42,7 +42,7 @@ The TCP port varies.
                         console.log("frame " + window.location.hostname + " could not load");
                         window.parent.postMessage({
                             status: "error"
-                        }, "*")
+                        }, "*");
                     } else if (error.message == 'hastoken') {
                         console.log('DNS rebinding did not happen yet')
                     } else if (error.message == '200') { // We received a 200
@@ -51,6 +51,9 @@ The TCP port varies.
                             " ms")
                     } else { // We did not handle something
                         console.log('Unhandled error: ' + error);
+                        window.parent.postMessage({
+                            status: "error",
+                        }, "*");
                     }
                 })
         }

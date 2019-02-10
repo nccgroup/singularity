@@ -1,8 +1,6 @@
 /* Attack Management */
 
 // Global state
-let count = 0;
-let errorCount = 0;
 let hosturl = "http://s-%1-%2-%3-%4-e.%5:%6/%7";
 
 // Configuration
@@ -33,6 +31,7 @@ const Frame = (id, url) => {
     let fmid = id;
     let fmurl = url;
     let timer = null;
+    let errorCount = 0;
     return {
         getId() {
             return fmid;
@@ -48,6 +47,12 @@ const Frame = (id, url) => {
         },
         setTimer(val) {
             return timer = val;
+        },
+        getErrorCount() {
+            return errorCount;
+        },
+        incrementErrorCount() {
+            return errorCount += 1;
         }
     }
 };
@@ -161,10 +166,10 @@ function receiveMessage(msg) {
 
     // Possibly a firewalled or closed port. Possibly a non-HTTP service.
     if (msg.data.status === "error") {
-        errorCount += 1;
+        fm.frame(fid).incrementErrorCount();
         console.log("error");
 
-        if (errorCount == 5) {
+        if (fm.frame(fid).getErrorCount() == 5) {
             document.getElementById(fid).contentWindow.postMessage({
                 cmd: "stop"
             }, "*");
@@ -206,7 +211,6 @@ function begin() {
 
     message.className = "d-block";
     start.disabled = true;
-    errorCount = 0;
    
     fm.frame(fid).setTimer(setInterval((() => {
         reloadAttackFrame(fm.frame(fid))
