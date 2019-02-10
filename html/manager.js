@@ -93,7 +93,7 @@ const FrameManager = () => {
         let id = Math.random().toString();
         u.setAttribute('href', url);
         u.setAttribute('id', id);
-        const o = `${u.protocol}//${u.hostname}:${u.port}`
+        const o = `${u.protocol}//${u.hostname}:${u.port}`;
         u.remove();
         return o;
     };
@@ -135,7 +135,7 @@ function addFrameToDOM(frame) {
     let f = document.createElement("iframe");
     f.src = frame.getURL();
     f.setAttribute('id', frame.getId());
-    document.getElementById("attackframes").appendChild(f)
+    document.getElementById("attackframes").appendChild(f);
 }
 
 // Set src of attackframe
@@ -346,6 +346,7 @@ document.onreadystatechange = function () {
     }
 };
 
+// Message handler between Manager and attack frames
 window.addEventListener("message", receiveMessage, false);
 
 // Initialization after manager content is loaded.
