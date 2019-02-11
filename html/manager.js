@@ -314,6 +314,7 @@ const App = () => {
                     document.getElementById("requestport").disabled = !HTTPServersConfig.AllowDynamicHTTPServers;
                 });
 
+                // Fet
                 let payloadsAndTargets = runningConfig.getManagerConfig();
 
                 // Once we have our HTTP servers config, payloads and targets
