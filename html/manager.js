@@ -18,7 +18,6 @@ const Payload = () => {
 }
 
 const RunningConfiguration = () => {
-
     let automatic = null;
     let delayDOMLoad = null;
     let alertSuccess = null;
@@ -115,7 +114,7 @@ const RunningConfiguration = () => {
         getInterval() {
             return interval;
         },
-        getRebindingStrategy(){
+        getRebindingStrategy() {
             return rebindingStrategy;
         }
     }
@@ -320,7 +319,7 @@ const App = () => {
 
                 // Once we have our HTTP servers config, payloads and targets
                 Promise.all([HTTPServersConfig, payloadsAndTargets]).then(function (values) {
-                    populateManagerConfig(); 
+                    populateManagerConfig();
                     //start attack on page load if ?startattack is set     
                     if (runningConfig.getAutomatic() !== null) {
                         self.begin();
@@ -335,24 +334,24 @@ const App = () => {
             f.setAttribute('id', frame.getId());
             document.getElementById("attackframes").appendChild(f);
         },
-        
+
         // Set src of attackframe
         // thus loading the attack payload before rebinding
         // and accessing the target after rebinding.
         reloadAttackFrame(frame) {
             document.getElementById(frame.getId()).src = frame.getURL() + "?rnd=" + Math.random();
         },
-        
+
         // communication handler between manager and attack iframe.
         receiveMessage(msg) {
             console.log("Message received from: ", msg.origin, msg.data.status);
-        
+
             const fid = fm.getFrameOrigin(msg.origin)
             // If we don't have a frame ID for this message origin, dismiss message.
             if (fid === undefined) {
                 return;
             };
-        
+
             if (msg.data.status == "start") {
                 console.log("Iframe reports that attack has started");
                 clearInterval(fm.frame(fid).getTimer());
@@ -371,25 +370,25 @@ const App = () => {
             }
             if (msg.data.status == "success") {
                 console.log("Iframe reports attack successful", msg.data.response);
-        
+
                 msg.source.postMessage({
                     cmd: "stop"
                 }, "*");
-        
+
                 setTimeout(function () {
                     delaydomloadframe.src = "about:blank";
                 }, 10000);
-        
+
                 if (runningConfig.getAlertSuccess() !== "false") {
                     alert("Attack Successful: " + document.domain + " " + msg.data.response);
                 }
             };
-        
+
             // Possibly a firewalled or closed port. Possibly a non-HTTP service.
             if (msg.data.status === "error") {
                 fm.frame(fid).incrementErrorCount();
                 console.log("error");
-        
+
                 if (fm.frame(fid).getErrorCount() == 5) {
                     document.getElementById(fid).contentWindow.postMessage({
                         cmd: "stop"
@@ -398,7 +397,7 @@ const App = () => {
                     alert("Too many errors");
                 }
             }
-        
+
         },
         // Starts attack
         begin() {
