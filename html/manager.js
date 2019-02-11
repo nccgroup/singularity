@@ -292,6 +292,7 @@ const App = () => {
 
             // Configuration
             runningConfig = RunningConfiguration();
+            // Initialize defaults settings and settings passed from URL query.
             runningConfig.init();
 
             // Remove the delaying of DOM load event (fully loaded page incl. images, css etc.) if not required
@@ -306,7 +307,7 @@ const App = () => {
             // Message handler between Manager and attack frames
             window.addEventListener("message", self.receiveMessage, false);
 
-            // Initialization after manager content is loaded.
+            // Sinularity HTTP server settings initialization
             document.addEventListener("DOMContentLoaded", function (event) {
                 let HTTPServersConfig = getHTTPServersConfig().then(function (HTTPServersConfig) {
                     document.getElementById("listenports").textContent = HTTPServersConfig.ports;
@@ -314,7 +315,7 @@ const App = () => {
                     document.getElementById("requestport").disabled = !HTTPServersConfig.AllowDynamicHTTPServers;
                 });
 
-                // Fet
+                // Fetch Manager configuration from Singularity HTTP server
                 let payloadsAndTargets = runningConfig.getManagerConfig();
 
                 // Once we have our HTTP servers config, payloads and targets
