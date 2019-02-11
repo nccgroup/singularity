@@ -455,6 +455,8 @@ func (hss *HTTPServerStoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 			return
 		}
 
+		r.Body = http.MaxBytesReader(w, r.Body, 5000)
+
 		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, emptyResponseStr, 400)
