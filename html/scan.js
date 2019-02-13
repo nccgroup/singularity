@@ -9,8 +9,9 @@ function timeout(ms, promise) {
 
 function scan(targetdata) {
     let sendDate = new Date().getTime();
-    timeout(3000, fetch(`http://${targetdata.address}:${targetdata.port}/`, {
-            mode: 'no-cors'
+    timeout(100, fetch(`http://${targetdata.address}:${targetdata.port}/`, {
+            mode: 'no-cors',
+            credentials: 'omit'
         }))
         .then(function (response) {
             let receiveDate = new Date().getTime();
