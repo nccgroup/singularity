@@ -58,7 +58,7 @@ The default RPC port for the rails web console is TCP 3000 (127.0.0.1:3000)
 				console.log("frame " + window.location.hostname + " could not load");
 				window.parent.postMessage({
 					status: "error",
-				}, "*")
+				}, "*");
 			} else if (error.message == 'hastoken') {
 				console.log('DNS rebinding did not happen yet')
 			} else if (error.message == '404') { // We received a 404
@@ -67,6 +67,9 @@ The default RPC port for the rails web console is TCP 3000 (127.0.0.1:3000)
 					" ms")
 			} else { // We did not handle something
 				console.log('Unhandled error: ' + error);
+				window.parent.postMessage({
+                            status: "error",
+                        }, "*");
 			}
 		});
 	}

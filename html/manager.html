@@ -83,7 +83,7 @@
 
             <div class="form-group row">
                 <div class="col-3">
-                    <input onclick="begin()" id=start type=submit value="Start Attack" autofocus>
+                    <input onclick="app.begin()" id=start type=submit value="Start Attack" autofocus>
                 </div>
                 <div class="col-3">
                     <input onclick="toggle()" type=submit value="Toggle Advanced Options">
@@ -163,12 +163,12 @@
 
 
         <div id=message class="d-none">
-            Please wait for DNS cache entries to expire. Inspect Google's Chrome cache with URL
-            "chrome://net-internals/#dns".
+            Please wait for DNS cache entries to expire.
         </div>
-
-        <iframe id=attackframeone src="about:blank"></iframe>
+        <div id=attackframes>
+        </div>
         <iframe id=delaydomloadframe src="/delaydomload" class="d-none"></iframe>
+
     </div>
 </body>
 
