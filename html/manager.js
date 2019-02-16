@@ -53,7 +53,7 @@ const RunningConfiguration = () => {
             // Set URL parameter `delaydomload` to some value 
             // to delay the browser DOM load event
             // and prevent premature exit of headless browsers
-            relayDOMLoad = getParameterByName("delaydomload");
+            delayDOMLoad = getParameterByName("delaydomload");
             // Set URL parameter `alertsuccess` to "false"
             // to not present an alert box upon a successful rebinding attack.
             // This may be useful for:

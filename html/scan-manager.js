@@ -1,5 +1,5 @@
 const ScanManager = () => {
-    
+
     function portsList(ports) {
         const portsExp = ports.split(",");
         let portsArr = [];
@@ -140,13 +140,60 @@ function resultFn(result) {
 
 function doneFn(results) {
     document.getElementById("results").innerHTML += "Done.<br/>";
-    setTimeout(function(){  sm.shutDown(); }, 3000);
-   
+    setTimeout(function () {
+        sm.shutDown();
+    }, 3000);
+
 }
 
 const scan = () => {
     sm = ScanManager();
     const addrSpec = document.getElementById("ipaddressspec").value;
     const portSpec = document.getElementById("portspec").value;
-    sm.run(addrSpec, portSpec, resultFn,doneFn);    
+    sm.run(addrSpec, portSpec, resultFn, doneFn);
+}
+
+const getLocalIpAddress = () => {
+    const p = new Promise((resolve, reject) => {
+        if (!(typeof(RTCPeerConnection) === "function")) {
+            reject(new Error('WebRTC is not supported'));
+            return;
+        };
+        const rtc = new RTCPeerConnection({iceServers: []});
+        const timer = setTimeout(() => reject(new Error("Promise timed out")), 1000);
+        rtc.onicecandidate = e => {
+            if (e.candidate) {
+                clearTimeout(timer),
+                resolve(e.candidate.candidate.split(" ", 5)[4]);
+            };
+        };
+        if (! (typeof(rtc.createDataChannel) === "function")) {
+            reject(new Error('createDataChannel is not supported'));
+            return;
+        };
+        rtc.createDataChannel('');
+        rtc.createOffer().then(d => rtc.setLocalDescription(d), e => reject(e));
+    })
+    return p;
+};
+
+const getLocalIpAddressThenScan = () => {
+    sm = ScanManager();
+    let addrSpec = `127.0.0.1,0.0.0.0,`;
+    const portSpec = document.getElementById("portspec").value;
+
+    getLocalIpAddress()
+    .then(address => {
+        const range = `${address.split('.', 3).join('.')}.1-255`;
+        addrSpec = `${addrSpec}${range}`;
+        document.getElementById("ipaddressspec").value = addrSpec;
+        sm.run(addrSpec, portSpec, resultFn, doneFn);
+    }, 
+    e => {
+        console.log(e);
+        addrSpec = `${addrSpec}192.168.1.1-255`;
+        document.getElementById("ipaddressspec").value = addrSpec;
+        sm.run(addrSpec, portSpec, resultFn, doneFn);
+        
+    })
 }

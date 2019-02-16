@@ -15,7 +15,8 @@
       <input name="portspec" id="portspec" value="80,443,1080,8080-8090">
     </div>
     <div>
-        <input onclick="scan()" id=start type=submit value="Scan" autofocus>
+        <input onclick="scan()" id=start1 type=submit value="Scan" autofocus>
+        <input onclick="getLocalIpAddressThenScan()" id=start2 type=submit value="Get Address+Scan()">
     </div>
   </form>
   <div id=results></div>
