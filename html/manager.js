@@ -38,7 +38,7 @@ const RunningConfiguration = () => {
     function getParameterByName(name, url) {
         if (!url) url = window.location.href;
         name = name.replace(/[\[\]]/g, '\\$&');
-        var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
+        let regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
             results = regex.exec(url);
         if (!results) return null;
         if (!results[2]) return '';
@@ -286,7 +286,7 @@ const App = () => {
 
     return {
         init() {
-            var self = this;
+            let self = this;
             fm = FrameManager();
 
             // Configuration
@@ -297,7 +297,7 @@ const App = () => {
             // Remove the delaying of DOM load event (fully loaded page incl. images, css etc.) if not required
             document.onreadystatechange = function () {
                 if (document.readyState === "interactive") {
-                    if (runningConfig.getDelayDOMLoad === null) {
+                    if (runningConfig.getDelayDOMLoad() === null) {
                         delaydomloadframe.parentNode.removeChild(delaydomloadframe);
                     }
                 }
@@ -401,7 +401,7 @@ const App = () => {
         },
         // Starts attack
         begin() {
-            var self = this;
+            let self = this;
 
             let fid = fm.addFrame(hosturl
                 .replace("%1", document.getElementById("attackhostipaddress").value)
