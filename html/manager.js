@@ -339,7 +339,7 @@ const App = () => {
         // thus loading the attack payload before rebinding
         // and accessing the target after rebinding.
         reloadAttackFrame(frame) {
-            document.getElementById(frame.getId()).src = frame.getURL() + "?rnd=" + Math.random();
+            document.getElementById(frame.getId()).src = frame.getURL();
         },
 
         // communication handler between manager and attack iframe.
@@ -410,7 +410,7 @@ const App = () => {
                 .replace("%4", document.getElementById("rebindingStrategy").value)
                 .replace("%5", document.getElementById("attackhostdomain").value)
                 .replace("%6", document.getElementById("targetport").value)
-                .replace("%7", document.getElementById("payloads").value));
+                .replace("%7", document.getElementById("payloads").value) +  "?rnd=" + Math.random());
 
             self.addFrameToDOM(fm.frame(fid));
 
@@ -421,7 +421,7 @@ const App = () => {
                 self.reloadAttackFrame(fm.frame(fid))
             }), parseInt(document.getElementById("interval").value) * 1000));
 
-            self.reloadAttackFrame(fm.frame(fid));
+            //self.reloadAttackFrame(fm.frame(fid));
         }
     }
 }
