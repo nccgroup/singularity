@@ -179,7 +179,7 @@ function getLocalIpAddress() {
     return p;
 };
 
-function getLocalIpAddressThenScan () {
+function getLocalIpAddressThenScan() {
     sm = ScanManager();
     let addrSpec = `127.0.0.1,0.0.0.0,`;
     const portSpec = document.getElementById("portspec").value;
