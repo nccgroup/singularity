@@ -12,6 +12,7 @@ Copy the content of this file to a new .html file and add its name to the
 /**
  * The attack() function is called when the user clicks the "Start Attack" button.
  */
+
 function attack() {
 	/* Send a GET request to '/' (the root web directory) to the IP address and
 	port defined in the manager UI. */
@@ -19,6 +20,9 @@ function attack() {
 		.then(responseOKOrFail("Could not fetch requested resource."))
 		.then(function (response) { // we successfully received the server response
 			if (response.includes(indextoken) == false && response.length > 0) {
+				if (response.status === 401) {
+					throw new Error('This resoure require authentication');	
+				}
 				clearInterval(timer); // stop the attack timer
 				console.log("SUCCESS"); // log to the console
 				// Terminate the attack:

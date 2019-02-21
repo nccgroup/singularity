@@ -280,11 +280,14 @@ const App = () => {
         document.getElementById('targethostipaddress').value = runningConfig.getTargetHostIPAddress();
         document.getElementById('dummyport').value = runningConfig.getDummyPort();
         document.getElementById('indextoken').value = runningConfig.getIndexToken();
-        document.getElementById('interval').value = runningConfig.getInterval();
+        document.getElementById('interval').value =  runningConfig.getInterval();
         document.getElementById(runningConfig.getRebindingStrategy()).selected = true;
     }
 
     return {
+        getFrameManager() {
+            return fm;
+        },
         init() {
             let self = this;
             fm = FrameManager();
@@ -332,6 +335,7 @@ const App = () => {
             let f = document.createElement("iframe");
             f.src = frame.getURL();
             f.setAttribute('id', frame.getId());
+            //f.setAttribute('style', "display: none");
             document.getElementById("attackframes").appendChild(f);
         },
 
@@ -357,11 +361,11 @@ const App = () => {
                 clearInterval(fm.frame(fid).getTimer());
                 msg.source.postMessage({
                     cmd: "interval",
-                    param: document.getElementById("interval").value
+                    param: "20" //runningConfig.getInterval()
                 }, "*");
                 msg.source.postMessage({
                     cmd: "indextoken",
-                    param: document.getElementById("indextoken").value
+                    param: runningConfig.getIndexToken()
                 }, "*");
                 msg.source.postMessage({
                     cmd: "start",
@@ -380,7 +384,7 @@ const App = () => {
                 }, 10000);
 
                 if (runningConfig.getAlertSuccess() !== "false") {
-                    alert("Attack Successful: " + document.domain + " " + msg.data.response);
+                    //alert("Attack Successful: " + document.domain + " " + msg.data.response);
                 }
             };
 

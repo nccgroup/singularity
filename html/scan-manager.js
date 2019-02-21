@@ -146,28 +146,30 @@ function doneFn(results) {
 
 }
 
-const scan = () => {
+function scan() {
     sm = ScanManager();
     const addrSpec = document.getElementById("ipaddressspec").value;
     const portSpec = document.getElementById("portspec").value;
     sm.run(addrSpec, portSpec, resultFn, doneFn);
 }
 
-const getLocalIpAddress = () => {
+function getLocalIpAddress() {
     const p = new Promise((resolve, reject) => {
-        if (!(typeof(RTCPeerConnection) === "function")) {
+        if (!(typeof (RTCPeerConnection) === "function")) {
             reject(new Error('WebRTC is not supported'));
             return;
         };
-        const rtc = new RTCPeerConnection({iceServers: []});
+        const rtc = new RTCPeerConnection({
+            iceServers: []
+        });
         const timer = setTimeout(() => reject(new Error("Promise timed out")), 1000);
         rtc.onicecandidate = e => {
             if (e.candidate) {
                 clearTimeout(timer),
-                resolve(e.candidate.candidate.split(" ", 5)[4]);
+                    resolve(e.candidate.candidate.split(" ", 5)[4]);
             };
         };
-        if (! (typeof(rtc.createDataChannel) === "function")) {
+        if (!(typeof (rtc.createDataChannel) === "function")) {
             reject(new Error('createDataChannel is not supported'));
             return;
         };
@@ -177,23 +179,23 @@ const getLocalIpAddress = () => {
     return p;
 };
 
-const getLocalIpAddressThenScan = () => {
+function getLocalIpAddressThenScan () {
     sm = ScanManager();
     let addrSpec = `127.0.0.1,0.0.0.0,`;
     const portSpec = document.getElementById("portspec").value;
 
     getLocalIpAddress()
-    .then(address => {
-        const range = `${address.split('.', 3).join('.')}.1-255`;
-        addrSpec = `${addrSpec}${range}`;
-        document.getElementById("ipaddressspec").value = addrSpec;
-        sm.run(addrSpec, portSpec, resultFn, doneFn);
-    }, 
-    e => {
-        console.log(e);
-        addrSpec = `${addrSpec}192.168.1.1-255`;
-        document.getElementById("ipaddressspec").value = addrSpec;
-        sm.run(addrSpec, portSpec, resultFn, doneFn);
-        
-    })
+        .then(address => {
+                const range = `${address.split('.', 3).join('.')}.1-255`;
+                addrSpec = `${addrSpec}${range}`;
+                document.getElementById("ipaddressspec").value = addrSpec;
+                sm.run(addrSpec, portSpec, resultFn, doneFn);
+            },
+            e => {
+                console.log(e);
+                addrSpec = `${addrSpec}192.168.1.1-255`;
+                document.getElementById("ipaddressspec").value = addrSpec;
+                sm.run(addrSpec, portSpec, resultFn, doneFn);
+
+            })
 }
