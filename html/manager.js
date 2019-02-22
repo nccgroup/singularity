@@ -165,7 +165,7 @@ const FrameManager = () => {
         let id = Math.random().toString();
         u.setAttribute('href', url);
         u.setAttribute('id', id);
-        const o = `${u.protocol}//${u.hostname}:${u.port}`;
+        const o = u.port ? `${u.protocol}//${u.hostname}:${u.port}`: `${u.protocol}//${u.hostname}`;
         u.remove();
         return o;
     };
