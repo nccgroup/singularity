@@ -26,7 +26,6 @@
             console.log(result);
             document.getElementById("activity").innerHTML += JSON.stringify(result, null, 4) + "<br/>";
             attackTarget(result.target.address, result.target.port)
-
         }
 
         function doneFn(results) {
@@ -34,12 +33,10 @@
             setTimeout(function () {
                 sm.shutDown();
             }, 3000);
-
         }
 
         function getLocalIpAddressThenScan2() {
             sm = ScanManager();
-
             getLocalIpAddress()
                 .then(address => {
                         const range = `${address.split('.', 3).join('.')}.1-255`;
