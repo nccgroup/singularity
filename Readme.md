@@ -222,7 +222,7 @@ Valid DNS rebinding strategy (`"rebindingStrategy"` setting) configuration file 
 
 These DNS rebinding strategies are explained in a later section.
 
-You need to edit this file if you add your own payloads or would like to automate an attack (covered later in this document).
+You need to edit this file if you add your own payloads.
 You do not need to edit the configuration file if you want to use existing
 payloads as you can change the parameters in the web interface.
 
@@ -313,17 +313,9 @@ Then modify the new HTML file to change the request URL for example.
 
 ### Attack Automation
 
-Attacks can be automatically delivered by `Singularity of Origin` to a victim by embedding its manager page in a hidden iframe of a "malicious" page (or modifying the manager page to look as desired) and enticing a user or headless browser to visit this page.
-
-First, configure the desired attack settings in the manager configuration file (`manager-config.json`). Then, ensure that the following parameters are passed in the Singularity manager interface URL, as appropriate:
-
-* `startattack`: If set to `true`, starts the attack immediately after the manager page has been loaded.
-* `delaydomload`: If set to `true`, maintains a connection to the headless browser to give time for the DNS rebinding attack to take place. Required for headless browsers.
-* `alert`: If set to `false`, ensure that `Singularity of Origin` JavaScript `alert()` dialog boxes are not displayed.
-
-The following sample URL will automatically start an attack, "hang" the browser while the attack happens, and displays an alert dialog box on success:
-
-http://rebinder.your.domain:80/manager.html?startattack=true&delaydomload=true&alert=true"
+Check https://github.com/nccgroup/singularity/blob/master/html/autoattack.html for
+an example on how to completely automate the scanning and exploitation of vulnerable 
+services on a network.
 
 ## Preventing DNS Rebinding Attacks
 
