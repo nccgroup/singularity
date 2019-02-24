@@ -19,6 +19,14 @@ const ScanManager = () => {
         return portsArr;
     };
 
+    //https://stackoverflow.com/questions/4460586/javascript-regular-expression-to-check-for-ip-addresses
+    function IsIPaddress(ipaddress) {  
+        if (/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ipaddress)) {  
+          return (true)  
+        }  
+        return (false)  
+    };
+          
     //https://stackoverflow.com/questions/12303989/cartesian-product-of-multiple-arrays-in-javascript
     const f = (a, b) => [].concat(...a.map(d => b.map(e => [].concat(d, e))));
     const cartesian = (a, b, ...c) => (b ? cartesian(f(a, b), ...c) : a);
