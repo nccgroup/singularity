@@ -570,7 +570,7 @@ func (h *DelayDOMLoadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		"Cache-Control: no-cache, no-store, must-revalidate\r\nContent-Length: 4\r\nContent-Type: text/html\r\n" +
 		"Expires: 0\r\nPragma: no-cache\r\nX-Dns-Prefetch-Control: off\r\nConnection: close\r\n\r\n<ht")
 	bufrw.Flush()
-	time.Sleep(10 * time.Second)
+	time.Sleep(90 * time.Second)
 }
 
 // NewHTTPServer configures a HTTP server
