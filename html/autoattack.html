@@ -19,7 +19,7 @@
             interval: "20",
             indexToken: "<!--thisismytesttoken-->"
         };
-        
+
         app.getConfiguration().setManually(configuration);
 
         const addrSpec = `127.0.0.1,0.0.0.0`;
@@ -29,7 +29,7 @@
         function scanFoundNewTargetCb(result) {
             console.log(result);
             document.getElementById("activity").innerHTML += JSON.stringify(result, null, 4) + "<br/>";
-            attackTarget(result.target.address, result.target.port, payload)
+            app.attackTarget(result.target.address, result.target.port, payload)
         }
 
         function scanDoneCb(results) {
@@ -54,17 +54,6 @@
         }
 
         getLocalIpAddressThenScan2();
-
-        function attackTarget(targetAddress, targetPort, payload) {
-            let self = this;
-            let fid = app.getFrameManager().addFrame(app.generateAttackUrl(targetAddress, targetPort, payload))
-
-            app.addFrameToDOM(app.getFrameManager().frame(fid));
-            app.getFrameManager().frame(fid).setTimer(setInterval((() => {
-                app.reloadAttackFrame(app.getFrameManager().frame(fid))
-            }), parseInt(app.getConfiguration().getInterval()) * 1000));
-
-        }
     </script>
 
     <div id="activity"></div>
