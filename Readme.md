@@ -94,9 +94,13 @@ Follow the instructions from the official [Go Programming Language web site](htt
 
 #### Obtain Singularity
 
-Open a terminal and type the following command:
+Open a terminal and type the following commands:
 
-`go get -v github.com/nccgroup/singularity/`
+```bash
+go get -v github.com/nccgroup/singularity/
+go get -v github.com/gorilla/mux
+go get -v github.com/gorilla/websocket
+````
 
 #### Compile 
 

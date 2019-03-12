@@ -1,6 +1,8 @@
 package singularity
 
 import (
+	crand "crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,7 +35,6 @@ var DNSRebindingStrategy = map[string]func(session string, dcss *DNSClientStateS
 // based on their current DNS rebinding state.
 // Must use RO or RW mutex to access.
 type DNSClientStateStore struct {
-	RebindingStrategy string
 	sync.RWMutex
 	Sessions map[string]*DNSClientState
 }
@@ -47,6 +48,18 @@ type AppConfig struct {
 	RebindingFnName              string
 	ResponseReboundIPAddrtimeOut int
 	AllowDynamicHTTPServers      bool
+	HTTPProxyServerPort          int
+}
+
+// GenerateRandomString returns a secure random hexstring, 20 chars long
+func GenerateRandomString() (string, error) {
+	c := 20
+	b := make([]byte, c)
+	_, err := crand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
 
 /*** DNS Stuff ***/
@@ -299,10 +312,10 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 						}
 					}
 
+					dcss.Lock()
 					_, keyExists := dcss.Sessions[name.Session]
 					log.Printf("DNS: session exists: %v\n", keyExists)
 
-					dcss.Lock()
 					if keyExists != true {
 						// New session
 						dcss.Sessions[name.Session] = clientState
@@ -370,9 +383,12 @@ type HTTPServerStoreHandler struct {
 	Errc                    chan HTTPServerError // communicates http server errors
 	AllowDynamicHTTPServers bool
 	sync.RWMutex
-	DynamicServers []*http.Server
-	StaticServers  []*http.Server
-	Dcss           *DNSClientStateStore
+	DynamicServers      []*http.Server
+	StaticServers       []*http.Server
+	Dcss                *DNSClientStateStore
+	Wscss               *WebsocketClientStateStore
+	HTTPProxyServerPort int
+	AuthToken           string
 }
 
 // IPTablesHandler is a HTTP handler that adds/removes iptables rules
@@ -482,7 +498,7 @@ func (hss *HTTPServerStoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		}
 		hss.Unlock()
 
-		httpServer := NewHTTPServer(port, hss, hss.Dcss)
+		httpServer := NewHTTPServer(port, hss, hss.Dcss, hss.Wscss)
 		httpServerErr := StartHTTPServer(httpServer, hss, true)
 
 		if httpServerErr != nil {
@@ -574,10 +590,15 @@ func (h *DelayDOMLoadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 // NewHTTPServer configures a HTTP server
-func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateStore) *http.Server {
+func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateStore,
+	wscss *WebsocketClientStateStore) *http.Server {
 	d := &DefaultHeadersHandler{NextHandler: http.FileServer(http.Dir("./html"))}
 	ipth := &IPTablesHandler{}
 	delayDOMLoadHandler := &DelayDOMLoadHandler{}
+	websocketHandler := &WebsocketHandler{dcss: dcss, wscss: wscss}
+	//hookedClientHandler := &hookedClientHandler{wscss: wscss, httpProxyServerPort: hss.HTTPProxyServerPort}
+	//hookedClientAuthHander := &AuthHandler{Username: "Singularity of Origin", Password: hss.BasicAuthPassword,
+	//	Realm: "Hooked Clients", NextHandler: hookedClientHandler}
 	h := http.NewServeMux()
 
 	h.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
@@ -601,7 +622,6 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 			dcss.RLock()
 			dnsCacheFlush := dcss.Sessions[name.Session].DNSCacheFlush
 			elapsed := time.Now().Sub(dcss.Sessions[name.Session].CurrentQueryTime)
-			//rebindingStrategy := dcss.RebindingStrategy
 			dcss.RUnlock()
 
 			if name.DNSRebindingStrategy == "fromquerymultia" {
@@ -619,6 +639,9 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 
 	h.Handle("/servers", hss)
 	h.Handle("/delaydomload", delayDOMLoadHandler)
+	//h.Handle("/sooproxy/", proxyHandler)
+	h.Handle("/soows", websocketHandler)
+	//h.Handle("/soohooked", hookedClientAuthHander)
 
 	httpServer := &http.Server{Addr: ":" + strconv.Itoa(port), Handler: h}
 

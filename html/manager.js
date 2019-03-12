@@ -485,7 +485,8 @@ const App = () => {
 function rebindingSuccessCb(msg) {
     console.log(`Iframe reports attack successful for ${window.location.hostname}\n${msg.data.response}`);
     if ((app.getConfiguration().getAlertSuccess() !== "false") &&
-        (app.getConfiguration().getType() === "manager")) {
+        (app.getConfiguration().getType() === "manager") &&
+        (document.getElementById("payloads").value !== "payload-hook-and-control.html")) {
         alert("Attack Successful: " + document.domain + " " + msg.data.response);
     }
 
@@ -494,3 +495,4 @@ function rebindingSuccessCb(msg) {
 // Start
 const app = App();
 app.init(rebindingSuccessCb);
+
