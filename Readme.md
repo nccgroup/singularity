@@ -49,8 +49,8 @@ It is also possible to trigger DNS rebinding before a cached DNS record expires,
   * Custom DNS server to rebind DNS name and IP address mapping from the attacker web server address to the target machine address
   * HTTP server to serve HTML pages and JavaScript code to targets and to manage the attacks
   * Several sample attack payloads, ranging from grabbing the home page of a target application to performing remote code execution. These payloads can be easily adapted to perform new and custom attacks.
-* Supports concurrent users
-* Provides several DNS rebinding strategies, including sequential mapping from the attacker to the target IP address and random mapping, to minimize the impact of IDS/IPS interfering with the attack
+* Supports concurrent users.
+* Provides several DNS rebinding strategies, including sequential mapping from the attacker to the target IP address and random mapping, to minimize the impact of IDS/IPS interfering with the attack.
 * A number of technical controls to maximize the reliability and speed of attacks:
   * Disabling HTTP keep alive, caching, DNS prefetching
   * Aggressive DNS response TTLs
@@ -59,6 +59,9 @@ It is also possible to trigger DNS rebinding before a cached DNS record expires,
 * Ability to allocate HTTP servers at startup or dynamically thereafter
   * A convenience feature to avoid restarting Singularity to listen on a different HTTP port.
   * To lay the ground work to attack vulnerable ports discovered after a scan.
+* Permits using target web browsers as HTTP proxies to internal network resources, to explore and exploit otherwise inaccessible applications with your own browser or tools such as `curl`.
+* A simple, fast and efficient HTTP port scanner to identify vulnerable services.
+* Provides both user interface driven or scripted attacks.
 
 ## Screenshots
 
@@ -253,6 +256,9 @@ Launch the Singularity binary, (`singularity-server`), with the `-h` parameter t
   Address after the last query.
   After the delay, we will respond with `ResponseReboundIPAddr`.
   The default is 300 seconds.
+-  `-httpProxyServerPort int` :
+  Specify the attacker HTTP Proxy Server port that permits to browse hijacked client services.
+  The default is 3129)
 
 ### Manager UI
 The manager web interface is where you configure and launch the DNS rebinding
@@ -305,6 +311,7 @@ Singularity supports the following attack payloads:
   a shell script.
 * **WebPDB** (`payload-exposed-webpdb`): A generic RCE payload to exploit `PDB`, 
   a python debugger exposed via websockets.
+* **Hook and Control** (`payload-hook-and-control.html`): Hijack target browsers and use them to access inaccessible resources from your own browser or other HTTP clients. You can retrieve the list of hooked browsers on the "soohooked" sub-domain of the Singularity manager host on port 3129 by default e.g. http://soohooked.rebinder.your.domain:3129/. To authenticate, setup your HTTP client to send a `Singularity-Of-Origin` HTTP header with each request, with the secret value dumped to the console by the Singularity server at startup.
 
 ### Creating Your Own Payloads
 
