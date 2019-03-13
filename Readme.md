@@ -61,7 +61,7 @@ It is also possible to trigger DNS rebinding before a cached DNS record expires,
   * To lay the ground work to attack vulnerable ports discovered after a scan.
 * Permits using target web browsers as HTTP proxies to internal network resources, to explore and exploit otherwise inaccessible applications with your own browser or tools such as `curl`.
 * A simple, fast and efficient HTTP port scanner to identify vulnerable services.
-* Provides both user interface driven or scripted attacks.
+* Provides both user interface driven and scripted attacks.
 
 ## Screenshots
 
@@ -258,7 +258,7 @@ Launch the Singularity binary, (`singularity-server`), with the `-h` parameter t
   The default is 300 seconds.
 -  `-httpProxyServerPort int` :
   Specify the attacker HTTP Proxy Server port that permits to browse hijacked client services.
-  The default is 3129)
+  The default is 3129.
 
 ### Manager UI
 The manager web interface is where you configure and launch the DNS rebinding
