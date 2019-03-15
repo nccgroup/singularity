@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/securecookie"
 	"github.com/gorilla/websocket"
 )
 
@@ -53,23 +54,11 @@ func (hch *hookedClientHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		},
 	}
 	const tpl = `
-<!DOCTYPE html>
-<html>
-	<head>
-		<meta charset="UTF-8">
-		<title>Hooked WS Clients</title>
-	</head>
+	<!doctype html><head><meta charset=utf-8><title>Hooked WS Clients</title></head><body>
 	<h3>Hooked WS Clients</h3>
-	<body>
-	<ul>
-	{{ $hostname := .Hostname }}
-	{{ $port := .HTTPProxyServerPort}}
-	{{ range $key, $value := .Sessions }}
+	<ul>{{ $hostname := .Hostname }}{{ $port := .HTTPProxyServerPort}}{{ range $key, $value := .Sessions }}
 	<li><a target="_blank" rel="noopener noreferrer" href="http://{{ $key }}.{{ $hostname }}:{{ $port }}/">{{ $key }}</a> {{ $value.Host }} {{FormatDate $value.LastSeenTime }} </li>
-    {{ end }}
-    </ul>
-	</body>
-</html>`
+    {{ end }}</ul></body></html>`
 	check := func(err error) {
 		if err != nil {
 			log.Fatal(err)
@@ -165,23 +154,131 @@ type WSClient struct {
 	counter uint64
 }
 
+const loginPage = `
+<!doctype html><head><meta charset=utf-8><title>Log in</title></head><body><h3>Log in</h3>
+<form method="post" action="/login">
+    <label for="password">Secret Token</label>
+    <input type="password" id="password" name="Secret Token">
+    <button type="submit">Login</button>
+</form></body></html>
+`
+
+const logoutPage = `
+<!doctype html><head><meta charset=utf-8><title>Log out</title></head><body><h3>Log out</h3>
+<form method="post" action="/logout"><button type="submit">Logout</button></form></body></html>
+`
+
+var cookieHandler = securecookie.New(
+	securecookie.GenerateRandomKey(64),
+	securecookie.GenerateRandomKey(32))
+
+func getAuthenticationStatus(r *http.Request) (authenticated string) {
+	if cookie, err := r.Cookie("singularity-of-origin-session"); err == nil {
+		cookieValue := make(map[string]string)
+		if err = cookieHandler.Decode("singularity-of-origin-session", cookie.Value, &cookieValue); err == nil {
+			authenticated = cookieValue["authenticated"]
+		}
+	}
+	return authenticated
+}
+
+func getTopProxyDomain(requestHost string) string {
+	var re = regexp.MustCompile(`(^[01234567890]+|soohooked)\.?(.+?)(:[012345689]+)*$`)
+	domain := re.ReplaceAllString(requestHost, `$2`)
+	return fmt.Sprintf(".%v", domain)
+}
+
+func setSession(authenticated string, r *http.Request, w http.ResponseWriter) {
+	value := map[string]string{
+		"authenticated": authenticated,
+	}
+
+	if encoded, err := cookieHandler.Encode("singularity-of-origin-session", value); err == nil {
+		cookie := &http.Cookie{
+			Name:   "singularity-of-origin-session",
+			Value:  encoded,
+			Path:   "/",
+			Domain: getTopProxyDomain(r.Host),
+		}
+		http.SetCookie(w, cookie)
+	}
+}
+
+func clearSession(r *http.Request, w http.ResponseWriter) {
+
+	cookie := &http.Cookie{
+		Name:   "singularity-of-origin-session",
+		Value:  "",
+		Path:   "/",
+		MaxAge: -1,
+		Domain: getTopProxyDomain(r.Host),
+	}
+	http.SetCookie(w, cookie)
+}
+
 // AuthHandler is an HTTP header token authentication handler
 type AuthHandler struct {
 	NextHandler http.Handler
-	AuthToken   string
 }
 
 func (ah *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if p, ok := Auth(r); !ok || !(p == ah.AuthToken) {
-		http.Error(w, "Authorization failed. Check the Singularity-Of-Origin HTTP header and value.", http.StatusUnauthorized)
+	authenticated := getAuthenticationStatus(r)
+	if authenticated != "true" {
+		_, port, err := net.SplitHostPort(r.Host)
+		if err != nil {
+			http.Error(w, "Authentication failed.", http.StatusUnauthorized)
+			return
+		}
+
+		http.Redirect(w, r, fmt.Sprintf("http://soohooked%v:%v/login", getTopProxyDomain(r.Host), port), 302)
+	} else {
+		ah.NextHandler.ServeHTTP(w, r)
+	}
+}
+
+type LoginHandler struct {
+	AuthToken string
+}
+
+func (lh *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	proxiedURL, err := url.Parse(r.RequestURI)
+	if err != nil {
+		log.Fatal(err)
+	}
+	url := proxiedURL.RequestURI()
+	fmt.Printf("Proxy: %v %v%v\n", r.Method, r.Host, url)
+	switch m := r.Method; m {
+	case "GET":
+		fmt.Fprintf(w, loginPage)
+		return
+	case "POST":
+		if p, ok := Auth(r); !ok || !(p == lh.AuthToken) {
+			http.Error(w, "Authentication failed.", http.StatusUnauthorized)
+			return
+		}
+	default:
+		http.Error(w, "Authentication failed.", http.StatusUnauthorized)
 		return
 	}
-	ah.NextHandler.ServeHTTP(w, r)
+	setSession("true", r, w)
+	http.Redirect(w, r, "/", 302)
+}
+
+func logoutHandler(w http.ResponseWriter, r *http.Request) {
+	switch m := r.Method; m {
+	case "POST":
+		setSession("false", r, w)
+		clearSession(r, w)
+		http.Redirect(w, r, "/", 302)
+	default:
+		fmt.Fprintf(w, logoutPage)
+		return
+	}
 }
 
 // Auth validates the authentication token
 func Auth(r *http.Request) (AuthToken string, ok bool) {
-	auth := r.Header.Get("Singularity-Of-Origin")
+	auth := r.FormValue("Secret Token")
 	if auth == "" {
 		return
 	}
@@ -377,9 +474,6 @@ func (t *ProxytoWebsocketTransport) RoundTrip(req *http.Request) (*http.Response
 func (p *ProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("HTTP: %v %v from %v", r.Method, r.RequestURI, r.RemoteAddr)
 
-	// Remove Singularity Auth Header so it is not forwarded to targets.
-	r.Header.Del("Singularity-Of-Origin")
-
 	proxiedURL, err := url.Parse(r.RequestURI)
 	if err != nil {
 		log.Fatal(err)
@@ -429,20 +523,21 @@ func NewHTTPProxyServer(port int, dcss *DNSClientStateStore,
 	//TKTK implement TLS
 	wscss *WebsocketClientStateStore, hss *HTTPServerStoreHandler) *http.Server {
 	proxyHandler := &ProxyHandler{Dcss: dcss, Wscss: wscss}
-	proxyAuthHandler := &AuthHandler{AuthToken: hss.AuthToken,
-		NextHandler: proxyHandler}
+	proxyLoginHandler := &LoginHandler{AuthToken: hss.AuthToken}
+	proxyAuthHandler := &AuthHandler{NextHandler: proxyHandler}
 	//h := http.NewServeMux()
 	hookedClientHandler := &hookedClientHandler{wscss: wscss, httpProxyServerPort: hss.HTTPProxyServerPort}
-	hookedClientAuthHandler := &AuthHandler{AuthToken: hss.AuthToken,
-		NextHandler: hookedClientHandler}
+	hookedClientAuthHandler := &AuthHandler{NextHandler: hookedClientHandler}
 
 	router := mux.NewRouter()
 	// Only matches if domain is "www.example.com".
 	// Matches a dynamic subdomain.
 	hookedSubRouter := router.Host(`{hookedSubRouter:soohooked.*}`).Subrouter()
-	hookedSubRouter.Handle("/", hookedClientAuthHandler)
+	hookedSubRouter.Handle("/login", proxyLoginHandler).Methods("GET", "POST")
+	hookedSubRouter.HandleFunc("/logout", logoutHandler).Methods("GET", "POST")
+	hookedSubRouter.PathPrefix("/").Handler(hookedClientAuthHandler)
 
-	proxySubRouter := router.Host(`{proxySubRouter:.*}`).Subrouter()
+	proxySubRouter := router.Host(`{proxySubRouter:[0123456789]+.*}`).Subrouter()
 	proxySubRouter.PathPrefix("/").Handler(proxyAuthHandler)
 
 	httpServer := &http.Server{Addr: ":" + strconv.Itoa(port), Handler: router}

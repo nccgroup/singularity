@@ -100,9 +100,10 @@ Follow the instructions from the official [Go Programming Language web site](htt
 Open a terminal and type the following commands:
 
 ```bash
-go get -v github.com/nccgroup/singularity/
+go get -v github.com/nccgroup/singularity
 go get -v github.com/gorilla/mux
 go get -v github.com/gorilla/websocket
+go get -v github.com/gorilla/securecookie
 ````
 
 #### Compile 
@@ -311,7 +312,7 @@ Singularity supports the following attack payloads:
   a shell script.
 * **WebPDB** (`payload-exposed-webpdb`): A generic RCE payload to exploit `PDB`, 
   a python debugger exposed via websockets.
-* **Hook and Control** (`payload-hook-and-control.html`): Hijack target browsers and use them to access inaccessible resources from your own browser or other HTTP clients. You can retrieve the list of hooked browsers on the "soohooked" sub-domain of the Singularity manager host on port 3129 by default e.g. http://soohooked.rebinder.your.domain:3129/. To authenticate, setup your HTTP client to send a `Singularity-Of-Origin` HTTP header with each request, with the secret value dumped to the console by the Singularity server at startup.
+* **Hook and Control** (`payload-hook-and-control.html`): Hijack target browsers and use them to access inaccessible resources from your own browser or other HTTP clients. You can retrieve the list of hooked browsers on the "soohooked" sub-domain of the Singularity manager host on port 3129 by default e.g. http://soohooked.rebinder.your.domain:3129/. To authenticate, submit the secret value dumped to the console by the Singularity server at startup.
 
 ### Creating Your Own Payloads
 
