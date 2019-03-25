@@ -36,5 +36,11 @@
     }, {
         "name": "payload-exposed-webpdb.html",
         "ports": []
+    }, {
+        "name": "payload-docker.html",
+        "ports": [2376]
+    }, {
+        "name": "payload-jenkins.html",
+        "ports": [8080]
     }]
 }
