@@ -310,9 +310,16 @@ Singularity supports the following attack payloads:
   For this attack to work, parameter `targetURL` in file `payload-duplicati-rce.html` must be updated to 
   point to a valid Duplicati backup containing the actual RCE payload, 
   a shell script.
-* **WebPDB** (`payload-exposed-webpdb`): A generic RCE payload to exploit `PDB`, 
+* **WebPDB** (`payload-exposed-pdb.html`): A generic RCE payload to exploit `PDB`, 
   a python debugger exposed via websockets.
 * **Hook and Control** (`payload-hook-and-control.html`): Hijack target browsers and use them to access inaccessible resources from your own browser or other HTTP clients. You can retrieve the list of hooked browsers on the "soohooked" sub-domain of the Singularity manager host on port 3129 by default e.g. http://soohooked.rebinder.your.domain:3129/. To authenticate, submit the secret value dumped to the console by the Singularity server at startup.
+* **Jenkins Script Console** (`payload-jenkins.html`): This payload exploits the
+  [Jenkins Script Console](https://wiki.jenkins.io/display/JENKINS/Jenkins+Script+Console)
+  and displays the stored credentials.
+* **Docker API** (`payload-docker.html`): This payload exploits the
+  [Docker API](https://docs.docker.com/engine/api/latest/)
+  and displays the `/etc/shadow` file of the Docker host.
+
 
 ### Creating Your Own Payloads
 
