@@ -97,7 +97,7 @@ type fetchRequest struct {
 	Credentials string            `json:"credentials"`
 	Headers     map[string]string `json:"headers"`
 	Redirect    string            `json:"redirect"`
-	Referrer    string            `json:"referrer"`
+	// Referrer    string            `json:"referrer"`
 	Body        []byte            `json:"body"`
 }
 
