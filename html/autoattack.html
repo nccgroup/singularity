@@ -78,7 +78,7 @@
         //   * 127.0.0.2
         //   * "localhost" for Firefox, Chrome
         //   * a CNAME such as "jenkins.internal-organization-domain.local"
-        const addrSpec = `127.0.0.1,0.0.0.0`;
+        let addrSpec = `127.0.0.1,0.0.0.0`;
 
         // Specify a port range to scan and attack
         // WARNING: You must ensure that Singularity listens on all these ports at startup for now.
@@ -113,9 +113,13 @@
         // if we can obtain our local IP address (Chrome and Firefox only), 
         // Then scan 127.0.0.1, 0.0.0.0 and local_ip_address/24
         // Otherwise scan 127.0.0.1, 0.0.0.0 and 192.168.1.1-254
+        // We also include our external IP address
+        // to exploit weak end system model in consumer/small business routers
         // Then fetch '/' and log to console.
-        function getLocalIpAddressThenScan() {
+        async function getLocalIpAddressesThenScan() {
             sm = ScanManager();
+            const externalAddress = await getMyExternalIpAddress();
+            addrSpec = `${addrSpec},${externalAddress}`;
             getLocalIpAddress()
                 .then(address => {
                         const range = `${address.split('.', 3).join('.')}.1-254`;
@@ -128,7 +132,7 @@
                     })
         }
         // and go!
-        getLocalIpAddressThenScan();
+        getLocalIpAddressesThenScan();
     </script>
 
     <h3>Scanning Progress</h3>

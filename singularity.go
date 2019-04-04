@@ -376,6 +376,13 @@ type DefaultHeadersHandler struct {
 	NextHandler http.Handler
 }
 
+// HTTPClientInfoHandler is a HTTP handler to provide HTTP client information
+// including IP address to HTTP cllients
+type HTTPClientInfoHandler struct {
+	IPAddress string
+	Port      string
+}
+
 // HTTPServerStoreHandler holds the list of HTTP servers
 // Many servers at startup and one (1) dynamically instantianted server
 // Access to the servers list must be performed via mutex
@@ -416,6 +423,27 @@ func (d *DefaultHeadersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Expires", "0")                                         // Proxies
 	w.Header().Set("X-DNS-Prefetch-Control", "off")                        //Chrome
 	d.NextHandler.ServeHTTP(w, r)
+}
+
+// HTTP Handler for "/clientinfo"
+func (hcih *HTTPClientInfoHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Printf("HTTP: %v %v from %v", r.Method, r.RequestURI, r.RemoteAddr)
+
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
+	emptyResponse, _ := json.Marshal(hcih)
+	splitted := strings.Split(r.RemoteAddr, ":")
+	hcih.IPAddress = splitted[0]
+	hcih.Port = splitted[1]
+	clientInfoResponse, _ := json.Marshal(hcih)
+
+	switch r.Method {
+	case "GET":
+		fmt.Fprintf(w, "%v", string(clientInfoResponse))
+	default:
+		http.Error(w, string(emptyResponse), 400)
+		return
+	}
 }
 
 // HTTP Handler for /servers
@@ -593,6 +621,7 @@ func (h *DelayDOMLoadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateStore,
 	wscss *WebsocketClientStateStore) *http.Server {
 	d := &DefaultHeadersHandler{NextHandler: http.FileServer(http.Dir("./html"))}
+	hcih := &HTTPClientInfoHandler{}
 	ipth := &IPTablesHandler{}
 	delayDOMLoadHandler := &DelayDOMLoadHandler{}
 	websocketHandler := &WebsocketHandler{dcss: dcss, wscss: wscss}
@@ -637,6 +666,7 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 		d.ServeHTTP(w, req)
 	})
 
+	h.Handle("/clientinfo", hcih)
 	h.Handle("/servers", hss)
 	h.Handle("/delaydomload", delayDOMLoadHandler)
 	//h.Handle("/sooproxy/", proxyHandler)
