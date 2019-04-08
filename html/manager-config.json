@@ -5,6 +5,7 @@
     "dummyPort": 4000,
     "interval": 20,
     "rebindingStrategy": "FromQueryFirstThenSecond",
+    "flushDns": false,
     "indexToken": "thisismytesttoken",
     "attackPayloads": [{
         "name": "payload-simple-fetch-get.html",

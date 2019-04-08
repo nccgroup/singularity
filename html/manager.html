@@ -7,8 +7,8 @@
     <meta charset="utf-8">
     <meta http-equiv="x-dns-prefetch-control" content="off">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.0/css/bootstrap.min.css" integrity="sha384-9gVQ4dYFwwWSjIDZnLEWnxCjeSWFphJiwGPXr1jddIhOegiu1FwO5qRGvFXOdJZ4"
-        crossorigin="anonymous">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.0/css/bootstrap.min.css"
+        integrity="sha384-9gVQ4dYFwwWSjIDZnLEWnxCjeSWFphJiwGPXr1jddIhOegiu1FwO5qRGvFXOdJZ4" crossorigin="anonymous">
 </head>
 
 <body>
@@ -16,7 +16,9 @@
         <h3>Singularity of Origin DNS Rebinding Attack</h3>
         <small class="text-muted">
             This attack typically takes ~1 min to work. This duration can be reduced to ~3s with the appropriate
-            options. Check the <a href="https://github.com/nccgroup/singularity">documentation</a>. Try the new, experimental HTTP port <a href="scan-manager.html">scanner</a>. Test the automatic identification of vulnerable services on your network upon visiting this <a href="autoattack.html">page</a>.
+            options. Check the <a href="https://github.com/nccgroup/singularity">documentation</a>. Try the new,
+            experimental HTTP port <a href="scan-manager.html">scanner</a>. Test the automatic identification of
+            vulnerable services on your network upon visiting this <a href="autoattack.html">page</a>.
         </small>
 
         <form action="javascript:void(0);">
@@ -51,8 +53,8 @@
                         <label for="targetport">Target Port</label>
                     </div>
                     <div class="col-2">
-                        <input id=targetport class="form-control" aria-describedby="targetportHelp" placeholder="e.g. 80"
-                            value="" />
+                        <input id=targetport class="form-control" aria-describedby="targetportHelp"
+                            placeholder="e.g. 80" value="" />
 
                     </div>
                     <div class="col-2">
@@ -88,10 +90,6 @@
                 <div class="col-3">
                     <input onclick="toggle()" type=submit value="Toggle Advanced Options">
                 </div>
-                <div class="col-3">
-                    <input onclick="forceCacheEviction()" class="d-none" id=evict type=submit value="Force Cache Eviction"
-                        title="Try this if the attack is taking too long">
-                </div>
             </div>
 
             <div id=advanced class="d-none">
@@ -116,17 +114,19 @@
                     </div>
                     <div class="col-3">
                         <select id="rebindingStrategy" class="rebindingstrategy-dropdown-content">
-                            <option id="FromQueryFirstThenSecond" value="FromQueryFirstThenSecond">First then second (default, conservative)</option>
+                            <option id="FromQueryFirstThenSecond" value="FromQueryFirstThenSecond">First then second
+                                (default, conservative)</option>
                             <option id="FromQueryMultiA" value="FromQueryMultiA">Multiple answers (fast)</option>
-                            <option id="FromQueryRoundRobin" value="FromQueryRoundRobin">Round robin (IPS/filters evasion)</option>
+                            <option id="FromQueryRoundRobin" value="FromQueryRoundRobin">Round robin (IPS/filters
+                                evasion)</option>
                             <option id="FromQueryRandom" value="FromQueryRandom">Random (IPS/filters evasion)</option>
                         </select>
                     </div>
                     <div class="col-7">
-                            <small id="rebindingstrategyHelp" class="form-text text-muted">
-                                Read the docs if changing from the default value to ensure that the attack will succeed.
-                            </small>
-                        </div>
+                        <small id="rebindingstrategyHelp" class="form-text text-muted">
+                            Read the docs if changing from the default value to ensure that the attack will succeed.
+                        </small>
+                    </div>
                 </div>
 
                 <div class="form-group row">
@@ -144,11 +144,24 @@
 
                 <div class="form-group row">
                     <div class="col-2">
+                        <label for="flushdns">Clear DNS Cache</label>
+                    </div>
+                    <div class="col-1">
+                        <input id=flushdns type="checkbox" value="" aria-describedby="flushdnsHelp" />
+                    </div>
+                    <div class="col-8">
+                        <small id="flushdnsHelp" class="checkbox text-muted">Attempts to flush browser DNS cache.
+                            Successfully tested on Chrome.</small>
+                    </div>
+                </div>
+
+                <div class="form-group row">
+                    <div class="col-2">
                         <label for="indextoken">Index Token</label>
                     </div>
                     <div class="col-3">
-                        <input id=indextoken class="form-control" aria-describedby="indextokenHelp" value="thisismytesttoken"
-                            spellcheck="false" />
+                        <input id=indextoken class="form-control" aria-describedby="indextokenHelp"
+                            value="thisismytesttoken" spellcheck="false" />
                     </div>
                     <div class="col-7">
                         <small id="indextokenHelp" class="form-text text-muted">The attack uses this string to

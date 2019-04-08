@@ -32,6 +32,7 @@ const Configuration = () => {
     let indexToken = null;
     let interval = null;
     let rebindingStrategy = null;
+    let flushDns = null;
 
     let rebindingSuccessFn = null;
 
@@ -102,6 +103,7 @@ const Configuration = () => {
                     indexToken = config.indexToken;
                     interval = config.interval;
                     rebindingStrategy = config.rebindingStrategy;
+                    flushDns = config.flushDns;
                 })
             return result;
         },
@@ -135,6 +137,12 @@ const Configuration = () => {
         getRebindingStrategy() {
             return rebindingStrategy;
         },
+        getFlushDns() {
+            return flushDns;
+        },
+        setFlushDns(boolean) {
+            flushDns = boolean;
+        },
         getRebindingSuccessFn() {
             return rebindingSuccessFn
         },
@@ -142,6 +150,7 @@ const Configuration = () => {
             attackHostIPAddress = configObject.attackHostIPAddress;
             attackHostDomain = configObject.attackHostDomain;
             rebindingStrategy = configObject.rebindingStrategy;
+            flushDns = configObject.flushDns;
             interval = configObject.interval;
             indexToken = configObject.indexToken;
             hideActivity = configObject.hideActivity;
@@ -322,6 +331,7 @@ const App = () => {
         document.getElementById('indextoken').value = configuration.getIndexToken();
         document.getElementById('interval').value = configuration.getInterval();
         document.getElementById(configuration.getRebindingStrategy()).selected = true;
+        document.getElementById('flushdns').checked = configuration.getFlushDns();
     };
 
     function generateAttackUrl(targetHostIPAddress, targetPort, payload) {
@@ -427,6 +437,10 @@ const App = () => {
                     param: configuration.getIndexToken()
                 }, "*");
                 msg.source.postMessage({
+                    cmd: "flushdns",
+                    param: {hostname: window.location.hostname, flushDns: configuration.getFlushDns()}
+                }, "*");
+                msg.source.postMessage({
                     cmd: "start",
                     param: null
                 }, "*");
@@ -458,6 +472,9 @@ const App = () => {
 
             const UiInterval = document.getElementById("interval").value;
             configuration.setInterval(UiInterval);
+
+            const UiFlushDns = document.getElementById("flushdns").checked;
+            configuration.setFlushDns(UiFlushDns);
 
             let fid = fm.addFrame(hosturl
                 .replace("%1", document.getElementById("attackhostipaddress").value)

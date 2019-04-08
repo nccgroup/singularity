@@ -1,6 +1,7 @@
 var timer;
 var frame;
 var sessionid;
+var flushdns;
 var xhr;
 var interval = 60000;
 
@@ -14,6 +15,12 @@ function initCommsWithParentFrame() {
                 break;
             case "indextoken":
                 indextoken = e.data.param;
+                break;
+            case "flushdns":
+                if (e.data.param.flushDns === true) {
+                    console.log("Flushing Browser DNS cache.");
+                    flushBrowserDnsCache(e.data.param.hostname);
+                }
                 break;
             case "stop":
                 clearInterval(timer);
@@ -270,5 +277,14 @@ function base64ArrayBuffer(arrayBuffer) {
         return originalAtob(inputString).replace(/[\xc0-\xff][\x80-\xbf]*/g, atobReplacer);
     };
 })(typeof global == "" + void 0 ? typeof self == "" + void 0 ? this : self : global);
+
+function flushBrowserDnsCache(hostname) {
+    let worker = new Worker('flushdnscache.js');
+    let params = {};
+    params.hostname = hostname;
+    params.port = document.location.port;
+    params.iterations = 1000;
+    worker.postMessage(params);
+}
 
 initCommsWithParentFrame();
