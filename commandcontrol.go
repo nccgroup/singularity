@@ -98,7 +98,7 @@ type fetchRequest struct {
 	Headers     map[string]string `json:"headers"`
 	Redirect    string            `json:"redirect"`
 	// Referrer    string            `json:"referrer"`
-	Body        []byte            `json:"body"`
+	Body []byte `json:"body"`
 }
 
 type fetchResponse struct {
@@ -246,7 +246,7 @@ func (lh *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(err)
 	}
 	url := proxiedURL.RequestURI()
-	fmt.Printf("Proxy: %v %v%v\n", r.Method, r.Host, url)
+	log.Printf("Proxy: %v %v%v\n", r.Method, r.Host, url)
 	switch m := r.Method; m {
 	case "GET":
 		fmt.Fprintf(w, loginPage)
@@ -310,7 +310,7 @@ func (c *WSClient) Request(op *websocketOperation) (interface{}, error) {
 	select {
 	case <-call.Done:
 	case <-time.After(90 * time.Second):
-		fmt.Printf("websockets: timeout ID:%v, %v\n", call.Req.ID, op.Payload.URL)
+		log.Printf("websockets: timeout ID:%v, %v\n", call.Req.ID, op.Payload.URL)
 		call.Error = errors.New("websockets: time out")
 	}
 
@@ -480,7 +480,7 @@ func (p *ProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	url := proxiedURL.RequestURI()
-	fmt.Printf("Proxy: %v %v%v\n", r.Method, r.Host, url)
+	log.Printf("Proxy: %v %v%v\n", r.Method, r.Host, url)
 
 	re := regexp.MustCompile(`^([0-9]+)\.(.*)$`)
 	matched := (re.FindStringSubmatch(r.Host))
@@ -512,7 +512,7 @@ func (p *ProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		req.URL.Path = MatchedURLRest
 	}
 
-	fmt.Printf("director: %v %v\n", session.Host, MatchedURLRest)
+	log.Printf("director: %v %v\n", session.Host, MatchedURLRest)
 
 	proxy := &httputil.ReverseProxy{Director: director, Transport: transport}
 
@@ -611,7 +611,7 @@ func (ws *WebsocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	client := NewWSClient()
 	client.conn = c
 
-	fmt.Printf("websockets: started a new session %v\n", name.Session)
+	log.Printf("websockets: started a new session %v\n", name.Session)
 
 	ws.wscss.Lock()
 	ws.wscss.Sessions[name.Session] = &WebsocketClientState{LastSeenTime: time.Now(),
