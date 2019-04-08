@@ -27,24 +27,24 @@
 
             // "FromQueryFirstThenSecond": 
             // Default, conservative. Use interval: "20" when choosing this strategy.
-            rebindingStrategy: 'FromQueryFirstThenSecond',
+            rebindingStrategy: 'fs',
 
             // "FromQueryMultiA": 
             // Multiple DNS answers (fast)
             // Rebinding in approximately 3 sec. Use interval: "1" when choosing this strategy.
             // Works against localhost only, specifically:
             // 0.0.0.0 when target is Linux/macos/Unix, and 127.0.0.1 when target is Windows based. 
-            // rebindingStrategy: 'FromQueryMultiA',
+            // rebindingStrategy: 'ma',
 
             // "FromQueryRoundRobin": 
             // Round robin. Slower. Use for IPS/filters evasion or when DNS requests arrive out of sync.
             // Use for IPS/filters evasion or when DNS requests arrive out of sync.
-            // rebindingStrategy: 'FromQueryRoundRobin',
+            // rebindingStrategy: 'rr',
 
             // "FromQueryRandom": 
             // Random. Slower. Use for IPS/filters evasion or when DNS requests arrive out of sync.
             //  Use for IPS/filters evasion or when DNS requests arrive out of sync.
-            // rebindingStrategy: 'FromQueryRandom',
+            // rebindingStrategy: 'rd',
 
             /* Rebinding Strategy section ends*/
 

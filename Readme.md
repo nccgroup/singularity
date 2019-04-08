@@ -126,7 +126,7 @@ $ cp ~/go/src/github.com/nccgroup/singularity/html/* ~/singularity/html/
  ```
 
 #### Run
- Start `singularity-server` with `sudo ./singularity-server --HTTPServerPort  8080`. This will use a DNS rebinding strategy based on the content of the DNS query by default e.g. `s-ip.ad.dr.ss-127.0.0.1-<random_number>-fromqueryfirstthensecond-e.dynamic.your.domain` will return first  "*ip.ad.dr.ss*", the attacker host IP address, then  "127.0.0.1" for subsequent queries for a limited period of time.
+ Start `singularity-server` with `sudo ./singularity-server --HTTPServerPort  8080`. This will use a DNS rebinding strategy based on the content of the DNS query by default e.g. `s-ip.ad.dr.ss-127.0.0.1-<random_number>-fs-e.dynamic.your.domain` will return first  "*ip.ad.dr.ss*", the attacker host IP address, then  "127.0.0.1" for subsequent queries for a limited period of time.
 
 Note: You will need to verify that other services do not listen on ports required by Singularity. 
 
@@ -223,10 +223,10 @@ You can modify this file to change the default parameters, such as  `attackHostD
 
 Valid DNS rebinding strategy (`"rebindingStrategy"` setting) configuration file values and their corresponding Singularity manager web interface values are as follows:
 
-* `"FromQueryFirstThenSecond"`: "First then second (default, conservative)"
-* `"FromQueryMultiA"`: "Multiple answers (fast)"
-* `"FromQueryRoundRobin"`: "Round robin (IPS/filters evasion)"
-* `"FromQueryRandom"`: "Random (IPS/filters evasion)".
+* `"fs"`: "First then second (default, conservative)"
+* `"ma"`: "Multiple answers (fast)"
+* `"rr"`: "Round robin (IPS/filters evasion)"
+* `"rd"`: "Random (IPS/filters evasion)".
 
 These DNS rebinding strategies are explained in a later section.
 
@@ -371,7 +371,7 @@ application via the Google Chrome browser for instance.
  * Cross-platform compilation: go to "~/singularity/cmd/singularity-server/" and type `env GOOS=linux GOARCH=amd64 go build` for a Linux build or `go build` from a mac OS machine for a Mac build.
  * The `fetch` API based attack scripts in the "html" directories will stop after 5 attempts if there are network errors.
  * Going to `chrome://net-internals/#dns` in the Chrome browser is great for debugging.
- * Test `dig` query: `dig "s-ip.ad.dr.ss-127.0.0.1-<random_number>-fromqueryfirstthensecond-e.dynamic.your.domain" @ip.ad.dr.ss`
+ * Test `dig` query: `dig "s-ip.ad.dr.ss-127.0.0.1-<random_number>-fs-e.dynamic.your.domain" @ip.ad.dr.ss`
  * `sudo ./singularity-server -HTTPServerPort 8080 -HTTPServerPort 8081  -dangerouslyAllowDynamicHTTPServers` starts a server on port 8080 and 8081 and enables requesting dynamically one additional HTTP port via the Manager interface.
  * Testing a service for a DNS rebinding vulnerability: In an HTTP intercepting proxy such as Portswigger's Burp Suite, replay a request to `localhost`, replacing the host header value e.g. "localhost" with "attacker.com". If the request is accepted, chances are that you have found a DNS rebinding vulnerability. What you can do after, the impact, depends on the vulnerable application.
  * Use the `Multiple answers (fast)` DNS rebinding strategy option in the advanced options of the manager interface for instant rebinding when supported by the target browser/OS combination and with the tested settings, summarized in the table above.  This strategy requires Linux `iptables` on the attacker host.

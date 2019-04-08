@@ -49,7 +49,7 @@ func initFromCmdLine() *singularity.AppConfig {
 	flag.Visit(func(f *flag.Flag) { flagset[f.Name] = true })
 
 	appConfig.RebindingFn = singularity.DNSRebindFromQueryFirstThenSecond
-	appConfig.RebindingFnName = "DNSRebindFromQueryFirstThenSecond"
+	appConfig.RebindingFnName = "fs"
 
 	if !flagset["HTTPServerPort"] {
 		myArrayPortFlags = arrayPortFlags{8080}

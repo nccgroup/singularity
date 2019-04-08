@@ -338,7 +338,7 @@ const App = () => {
         return hosturl
             .replace("%1", configuration.getAttackHostIPAddress())
             .replace("%2", targetHostIPAddress) // replace(/-/g, '--'))
-            .replace("%3", Math.floor(Math.random() * Math.floor(Number.MAX_SAFE_INTEGER)))
+            .replace("%3", Math.floor(Math.random() * 2 ** 32))
             .replace("%4", configuration.getRebindingStrategy())
             .replace("%5", configuration.getAttackHostDomain())
             .replace("%6", targetPort)
@@ -479,7 +479,7 @@ const App = () => {
             let fid = fm.addFrame(hosturl
                 .replace("%1", document.getElementById("attackhostipaddress").value)
                 .replace("%2", document.getElementById("targethostipaddress").value.replace(/-/g, '--'))
-                .replace("%3", Math.floor(Math.random() * Math.floor(Number.MAX_SAFE_INTEGER)))
+                .replace("%3", Math.floor(Math.random() * 2 ** 32))
                 .replace("%4", document.getElementById("rebindingStrategy").value)
                 .replace("%5", document.getElementById("attackhostdomain").value)
                 .replace("%6", document.getElementById("targetport").value)

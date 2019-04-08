@@ -24,10 +24,10 @@ import (
 
 //DNSRebindingStrategy maps a DNS Rebinding strategy name to a function
 var DNSRebindingStrategy = map[string]func(session string, dcss *DNSClientStateStore, q dns.Question) []string{
-	"fromqueryroundrobin":      DNSRebindFromQueryRoundRobin,
-	"fromqueryfirstthensecond": DNSRebindFromQueryFirstThenSecond,
-	"fromqueryrandom":          DNSRebindFromQueryRandom,
-	"fromquerymultia":          DNSRebindFromQueryMultiA,
+	"rr": DNSRebindFromQueryRoundRobin,
+	"fs": DNSRebindFromQueryFirstThenSecond,
+	"rd": DNSRebindFromQueryRandom,
+	"ma": DNSRebindFromQueryMultiA,
 }
 
 // DNSClientStateStore stores DNS sessions
