@@ -72,7 +72,6 @@ type DNSClientState struct {
 	ResponseReboundIPAddr        string
 	LastResponseReboundIPAddr    int
 	ResponseReboundIPAddrtimeOut int
-	DNSCacheFlush                bool
 }
 
 // ExpireOldEntries expire DNS Client Sessions
@@ -97,7 +96,6 @@ type DNSQuery struct {
 	ResponseReboundIPAddr string
 	Session               string
 	DNSRebindingStrategy  string
-	DNSCacheFlush         bool
 	Domain                string
 }
 
@@ -161,11 +159,6 @@ func NewDNSQuery(qname string) (*DNSQuery, error) {
 
 	}
 
-	/*if len(elements[3]) != 0 {
-		name.DNSCacheFlush = true
-	}
-	*/
-
 	name.DNSRebindingStrategy = elements[3]
 
 	name.Domain = fmt.Sprintf(".%v", domainSuffix)
@@ -189,17 +182,15 @@ func dnsRebindFirst(session string, dcss *DNSClientStateStore, q dns.Question) [
 func DNSRebindFromQueryFirstThenSecond(session string, dcss *DNSClientStateStore, q dns.Question) []string {
 	dcss.RLock()
 	answers := []string{dcss.Sessions[session].ResponseIPAddr}
-	dnsCacheFlush := dcss.Sessions[session].DNSCacheFlush
 	elapsed := dcss.Sessions[session].CurrentQueryTime.Sub(dcss.Sessions[session].LastQueryTime)
 	timeOut := dcss.Sessions[session].ResponseReboundIPAddrtimeOut
 
 	log.Printf("DNS: in DNSRebindFromQueryFirstThenSecond\n")
 
-	if dnsCacheFlush == false { // This is not a request for cache eviction
-		if elapsed < (time.Second * time.Duration(timeOut)) {
-			answers[0] = dcss.Sessions[session].ResponseReboundIPAddr
-		}
+	if elapsed < (time.Second * time.Duration(timeOut)) {
+		answers[0] = dcss.Sessions[session].ResponseReboundIPAddr
 	}
+
 	dcss.RUnlock()
 	return answers
 }
@@ -210,15 +201,12 @@ func DNSRebindFromQueryFirstThenSecond(session string, dcss *DNSClientStateStore
 func DNSRebindFromQueryRandom(session string, dcss *DNSClientStateStore, q dns.Question) []string {
 	dcss.RLock()
 	answers := []string{dcss.Sessions[session].ResponseIPAddr}
-	dnsCacheFlush := dcss.Sessions[session].DNSCacheFlush
 	hosts := []string{dcss.Sessions[session].ResponseIPAddr, dcss.Sessions[session].ResponseReboundIPAddr}
 	dcss.RUnlock()
 
 	log.Printf("DNS: in DNSRebindFromQueryRandom\n")
 
-	if dnsCacheFlush == false { // This is not a request for cache eviction
-		answers[0] = hosts[rand.Intn(len(hosts))]
-	}
+	answers[0] = hosts[rand.Intn(len(hosts))]
 
 	return answers
 }
@@ -229,7 +217,6 @@ func DNSRebindFromQueryRandom(session string, dcss *DNSClientStateStore, q dns.Q
 func DNSRebindFromQueryRoundRobin(session string, dcss *DNSClientStateStore, q dns.Question) []string {
 	dcss.RLock()
 	answers := []string{dcss.Sessions[session].ResponseIPAddr}
-	dnsCacheFlush := dcss.Sessions[session].DNSCacheFlush
 	ResponseIPAddr := dcss.Sessions[session].ResponseIPAddr
 	ResponseReboundIPAddr := dcss.Sessions[session].ResponseReboundIPAddr
 	LastResponseReboundIPAddr := dcss.Sessions[session].LastResponseReboundIPAddr
@@ -237,21 +224,21 @@ func DNSRebindFromQueryRoundRobin(session string, dcss *DNSClientStateStore, q d
 
 	log.Printf("DNS: in DNSRebindFromQueryRoundRobin\n")
 
-	if dnsCacheFlush == false { // This is not a request for cache eviction
-		hosts := []string{"", ResponseIPAddr, ResponseReboundIPAddr}
-		switch LastResponseReboundIPAddr {
-		case 0:
-			LastResponseReboundIPAddr = 1
-		case 1:
-			LastResponseReboundIPAddr = 2
-		case 2:
-			LastResponseReboundIPAddr = 1
-		}
-		dcss.Lock()
-		dcss.Sessions[session].LastResponseReboundIPAddr = LastResponseReboundIPAddr
-		dcss.Unlock()
-		answers[0] = hosts[LastResponseReboundIPAddr]
+	hosts := []string{"", ResponseIPAddr, ResponseReboundIPAddr}
+	switch LastResponseReboundIPAddr {
+	case 0:
+		LastResponseReboundIPAddr = 1
+	case 1:
+		LastResponseReboundIPAddr = 2
+	case 2:
+		LastResponseReboundIPAddr = 1
 	}
+
+	dcss.Lock()
+	dcss.Sessions[session].LastResponseReboundIPAddr = LastResponseReboundIPAddr
+	dcss.Unlock()
+
+	answers[0] = hosts[LastResponseReboundIPAddr]
 
 	return answers
 }
@@ -291,7 +278,6 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 					// Preparing to update the client DNS query state
 					clientState.CurrentQueryTime = now
 					clientState.ResponseReboundIPAddrtimeOut = appConfig.ResponseReboundIPAddrtimeOut
-					clientState.DNSCacheFlush = false
 
 					var err error
 					name, err = NewDNSQuery(q.Name)
@@ -306,7 +292,6 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 					} else {
 						clientState.ResponseIPAddr = name.ResponseIPAddr
 						clientState.ResponseReboundIPAddr = name.ResponseReboundIPAddr
-						clientState.DNSCacheFlush = name.DNSCacheFlush
 						if fn, ok := DNSRebindingStrategy[name.DNSRebindingStrategy]; ok {
 							rebindingFn = fn
 						}
@@ -324,7 +309,6 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 						dcss.Sessions[name.Session].ResponseIPAddr = clientState.ResponseIPAddr
 						dcss.Sessions[name.Session].ResponseReboundIPAddr = clientState.ResponseReboundIPAddr
 					}
-					dcss.Sessions[name.Session].DNSCacheFlush = clientState.DNSCacheFlush
 					dcss.Unlock()
 
 					answers := rebindingFn(name.Session, dcss, q)
@@ -649,17 +633,14 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 		if err == nil {
 
 			dcss.RLock()
-			dnsCacheFlush := dcss.Sessions[name.Session].DNSCacheFlush
 			elapsed := time.Now().Sub(dcss.Sessions[name.Session].CurrentQueryTime)
 			dcss.RUnlock()
 
 			if name.DNSRebindingStrategy == "ma" {
-				if dnsCacheFlush == false { // This is not a request for cache eviction
-					if elapsed > (time.Second * time.Duration(3)) {
-						log.Printf("HTTP: attempting Multiple A records rebinding for: %v", name)
-						ipth.ServeHTTP(w, req)
-						return
-					}
+				if elapsed > (time.Second * time.Duration(3)) {
+					log.Printf("HTTP: attempting Multiple A records rebinding for: %v", name)
+					ipth.ServeHTTP(w, req)
+					return
 				}
 			}
 		}
