@@ -653,7 +653,7 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 			elapsed := time.Now().Sub(dcss.Sessions[name.Session].CurrentQueryTime)
 			dcss.RUnlock()
 
-			if name.DNSRebindingStrategy == "fromquerymultia" {
+			if name.DNSRebindingStrategy == "ma" {
 				if dnsCacheFlush == false { // This is not a request for cache eviction
 					if elapsed > (time.Second * time.Duration(3)) {
 						log.Printf("HTTP: attempting Multiple A records rebinding for: %v", name)
