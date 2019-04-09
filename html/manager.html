@@ -43,7 +43,9 @@
                     <label for="targethostipaddress">Target Host</label>
                 </div>
                 <div class="col-4">
-                    <input id=targethostipaddress class="form-control" value="127.0.0.1" spellcheck="false" />
+                    <input id=targethostipaddress class="form-control" value="127.0.0.1" spellcheck="false" 
+						data-toggle="tooltip" data-placement="top" 
+						title="IP address, hostname, or FQDN (e.g. 127.0.0.1, 0.0.0.0, localhost, wiki, www.example.com)" />
                 </div>
             </div>
 
@@ -114,12 +116,10 @@
                     </div>
                     <div class="col-3">
                         <select id="rebindingStrategy" class="rebindingstrategy-dropdown-content">
-                            <option id="fs" value="fs">First then second
-                                (default, conservative)</option>
-                            <option id="ma" value="ma">Multiple answers (fast)</option>
-                            <option id="rr" value="rr">Round robin (IPS/filters
-                                evasion)</option>
-                            <option id="rd" value="rd">Random (IPS/filters evasion)</option>
+                            <option id="fs" value="fs" title="Default, conservative">First then second</option>
+                            <option id="ma" value="ma" title="Fast">Multiple answers</option>
+                            <option id="rr" value="rr" title="IPS/filters evasion">Round robin</option>
+                            <option id="rd" value="rd" title="IPS/filters evasion">Random</option>
                         </select>
                     </div>
                     <div class="col-7">
@@ -134,7 +134,8 @@
                         <label for="interval">Interval</label>
                     </div>
                     <div class="col-2">
-                        <input id=interval class="form-control" aria-describedby="intervalHelp" value="20" />
+                        <input id=interval class="form-control" aria-describedby="intervalHelp" value="20" 
+							title="Recommendation: 1 second when using 'Multiple answers', 20 seconds for all other rebinding strategies" />
                     </div>
                     <div class="col-8">
                         <small id="intervalHelp" class="form-text text-muted">How long to wait between attempts in
@@ -144,7 +145,7 @@
 
                 <div class="form-group row">
                     <div class="col-2">
-                        <label for="flushdns">Clear DNS Cache</label>
+                        <label for="flushdns">Flood DNS Cache</label>
                     </div>
                     <div class="col-1">
                         <input id=flushdns type="checkbox" value="" aria-describedby="flushdnsHelp" />

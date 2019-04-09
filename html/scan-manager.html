@@ -8,15 +8,15 @@
 <form action="javascript:void(0);">
     <div>
       <label for="ipAddressSpec">IP address specification e.g. 127.0.0.1,10.0.1.0-255</label>
-      <input name="ipaddressspec" id="ipaddressspec" value="127.0.0.1,192.168.0.1-2">
+      <input name="ipaddressspec" id="ipaddressspec" value="127.0.0.1,192.168.0.1-2" size="40" title="IP addresses, hostnames, or FQDNs (e.g. 192.168.1.1, localhost, 10.3-4.1.1-254, jenkins.corp.local)">
     </div>
     <div>
       <label for="portSpec">Ports specification e.g. 80,443,1080,8080-8090</label>
-      <input name="portspec" id="portspec" value="80,443,1080,8080-8090">
+      <input name="portspec" id="portspec" value="80,443,1080,8080-8090" size="40" title="Portrange">
     </div>
     <div>
-        <input onclick="scan()" id=start1 type=submit value="Scan" autofocus>
-        <input onclick="getMyIpAddressesThenScan()" id=start2 type=submit value="Get Address+Scan()">
+        <input onclick="scan()" id=start1 type=submit value="Scan" title="Start the port scan of the provided hosts and ports" autofocus>
+        <input onclick="getMyIpAddressesThenScan()" id=start2 type=submit value="Get Address+Scan()" title="Attempts to retrieve the local interface IP address and the public IP address and starts the port scan">
     </div>
   </form>
   <h2>Results</h2>
