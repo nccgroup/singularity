@@ -5,6 +5,7 @@ It includes the necessary components to rebind the IP address of the attack serv
 
 It also ships with sample payloads to exploit several vulnerable software versions, from the simple capture of a home page to performing remote code execution. It aims at providing a framework to facilitate the exploitation of software vulnerable to DNS rebinding attacks and to raise awareness on how they work and how to protect from them.
 
+Detailed documentation is on the [wiki pages](https://github.com/nccgroup/singularity/wiki).
 
 ## Core Features
 
@@ -12,6 +13,7 @@ It also ships with sample payloads to exploit several vulnerable software versio
   - Custom **DNS server** to rebind DNS name and IP address
   - **HTTP server** (manager web interface) to serve HTML pages and JavaScript code to targets and to manage the attacks
   - Several **sample attack payloads**, ranging from grabbing the home page of a target application to performing remote code execution. These payloads can be easily adapted to perform new and custom attacks.
+  - Supports DNS CNAME values in target specification in addition to IP addresses to evade DNS filtering solutions or to target internal resources for which the IP address is unknown.
 - A simple, fast and efficient HTTP **port scanner** to identify vulnerable services.
 - **Attack automation** allows to completely automate the scanning and exploitation of vulnerable services on a network.
 - **Hook and Control** permits using victim web browsers as HTTP proxies to access internal network resources, to interactively explore and exploit otherwise inaccessible applications with your own browser.
