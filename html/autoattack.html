@@ -52,6 +52,9 @@
             // Use "20" for all rebinding strategies except for "FromQueryMultiA", where "1" will work.
             interval: "20",
 
+            // Flush Chrome DNS browser cache to improve DNS Rebinding attack speed.
+            flushDns: false,
+
             // One of several tricks to determine 
             // whether we are pointing against the attacker or the victim domain.
             indexToken: "<!--thisismytesttoken-->",

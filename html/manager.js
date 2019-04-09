@@ -440,6 +440,7 @@ const App = () => {
                     cmd: "flushdns",
                     param: {hostname: window.location.hostname, flushDns: configuration.getFlushDns()}
                 }, "*");
+                configuration.setFlushDns(false); // so it run only once in autoattack.
                 msg.source.postMessage({
                     cmd: "start",
                     param: null
