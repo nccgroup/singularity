@@ -406,6 +406,7 @@ func (d *DefaultHeadersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Pragma", "no-cache")                                   // HTTP 1.0
 	w.Header().Set("Expires", "0")                                         // Proxies
 	w.Header().Set("X-DNS-Prefetch-Control", "off")                        //Chrome
+	w.Header().Set("X-Singularity-Of-Origin", "t")
 	d.NextHandler.ServeHTTP(w, r)
 }
 
