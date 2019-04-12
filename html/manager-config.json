@@ -14,9 +14,6 @@
         "name": "payload-hook-and-control.html",
         "ports": []
     }, {
-        "name": "payload-simple-xhr-get.html",
-        "ports": []
-    }, {
         "name": "payload-exposed-chrome-devtools.html",
         "ports": [9333]
     }, {

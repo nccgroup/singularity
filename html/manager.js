@@ -453,6 +453,13 @@ const App = () => {
                 }, "*");
             };
 
+            if (msg.data.status === "requiresHttpAuthentication") {
+                document.getElementById(fid).contentWindow.postMessage({
+                    cmd: "stop"
+                }, "*");
+                console.log("This resource requires HTTP authentication. Cannot access without user noticing.");
+            }
+
             // Possibly a firewalled or closed port. Possibly a non-HTTP service.
             if (msg.data.status === "error") {
                 fm.frame(fid).incrementErrorCount();

