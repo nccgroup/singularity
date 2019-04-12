@@ -67,9 +67,6 @@ Singularity supports the following attack payloads:
   using the `fetch` API.
   The goal of this payload is to function as example request to make additional
   contributions as easy as possible.
-* **Basic XHR request** (`payload-simple-xhr-get.html`): Another sample payload to
-  make a GET request to the root directory ('/') and showing the server response
-  using `XMLHttpRequest` (XHR).
 * **Chrome DevTools** (`payload-exposed-chrome-devtools.html`): This payload
   demonstrates a remote code execution (RCE) vulnerability in Microsoft VS Code fixed in version 1.19.3.
   This payload can be adapted to exploit any software that exposes Chrome Dev Tools on `localhost`.
