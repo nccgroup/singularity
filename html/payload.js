@@ -378,3 +378,5 @@ function httpHeaderstoText(headers) {
     };
     return out;
 }
+
+let Registry = [];
