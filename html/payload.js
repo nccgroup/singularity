@@ -91,7 +91,7 @@ const Rebinder = () => {
                 body = responseData;
                 clearInterval(timer); // stop the attack timer
                 // Report success to parent frame
-                window.parent.postMessage({ //TKTK fix Docker hack
+                window.parent.postMessage({
                     status: "success",
                     response: body
                 }, "*");

@@ -29,7 +29,7 @@
         "name": "payload-aws-metadata.html",
         "ports": [80]
     }, {
-        "name": "payload-duplicati-rce.html",
+        "name": "Duplicati RCE",
         "ports": [8200]
     }, {
         "name": "payload-exposed-webpdb.html",

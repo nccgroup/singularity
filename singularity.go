@@ -459,7 +459,7 @@ func concatenateJS(dirPath string) []byte {
 	return js_code
 }
 
-// HTTP Handler for "/soopayload.html"
+// HTTP Handler for "/soopayload"
 func (pth *PayloadTemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("HTTP: %v %v from %v", r.Method, r.RequestURI, r.RemoteAddr)
 
@@ -471,10 +471,13 @@ func (pth *PayloadTemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	function attack(payload, headers, cookie, body) {
 	const titleEl = document.getElementById('title');
 		if (payload === 'automatic') {
-			for (const payload in Registry) {
-				titleEl.innerText = payload;
-				if (Registry[payload].isService() === true)
-				Registry[payload].attack(headers, cookie, body);
+			for (let payload in Registry) {
+				if (Registry[payload].isService(headers, cookie, body) === true) {
+					titleEl.innerText = payload;
+					console.log("Payload " + payload + " has identified a service.");
+					Registry[payload].attack(headers, cookie, body);
+					break;
+				}
 			};
 		} else {
 			titleEl.innerText = payload;
