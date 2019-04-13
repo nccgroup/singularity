@@ -8,10 +8,10 @@
     "flushDns": false,
     "indexToken": "thisismytesttoken",
     "attackPayloads": [{
-        "name": "payload-simple-fetch-get.html",
+        "name": "SimpleFetchGet",
         "ports": []
     }, {
-        "name": "payload-hook-and-control.html",
+        "name": "automatic",
         "ports": []
     }, {
         "name": "payload-exposed-chrome-devtools.html",

