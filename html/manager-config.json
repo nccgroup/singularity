@@ -8,7 +8,10 @@
     "flushDns": false,
     "indexToken": "thisismytesttoken",
     "attackPayloads": [{
-        "name": "SimpleFetchGet",
+        "name": "Simple Fetch Get",
+        "ports": []
+    },{
+        "name": "Hook and Control",
         "ports": []
     }, {
         "name": "automatic",
