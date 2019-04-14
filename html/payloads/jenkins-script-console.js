@@ -1,7 +1,10 @@
 /**
-This is a sample payload to make a simple GET request and display the response.
-Copy the content of this file to a new .js file and add its name to the
-`attackPayloads` list in the manager-config.json file.
+This payload exploits the Jenkins Script Console 
+(https://wiki.jenkins.io/display/JENKINS/Jenkins+Script+Console)
+and displays the stored credentials.
+Requirement:
+- Script Console enabled without authentication at <target>/script
+The default port for Jenkins is TCP 8080 (127.0.0.1:8080)
 **/
 
 const JenkinsScriptConsole = () => {
