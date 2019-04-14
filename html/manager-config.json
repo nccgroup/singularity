@@ -41,7 +41,7 @@
         "name": "payload-docker.html",
         "ports": [2376]
     }, {
-        "name": "payload-jenkins.html",
+        "name": "Jenkins Script Console",
         "ports": [8080]
     }]
 }
