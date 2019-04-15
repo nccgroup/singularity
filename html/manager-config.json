@@ -29,7 +29,7 @@
         "name": "payload-rails-webconsole.html",
         "ports": [3000]
     }, {
-        "name": "payload-aws-metadata.html",
+        "name": "AWS Metadata Exfil",
         "ports": [80]
     }, {
         "name": "Duplicati RCE",
