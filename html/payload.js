@@ -132,6 +132,16 @@ const Rebinder = () => {
     }
 }
 
+function timeout(ms, promise,controller) {
+    return new Promise(function (resolve, reject) {
+        setTimeout(function () {
+            controller.abort();
+            reject(new Error("timeout"))
+        }, ms)
+        promise.then(resolve, reject)
+    })
+}
+
 function begin(url) {
     const hostnameEl = document.getElementById('hostname');
     const arr = window.location.hostname.split('-');

@@ -442,8 +442,9 @@ func (hcih *HTTPClientInfoHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+//https://siongui.github.io/2016/03/06/go-concatenate-js-files/
 func concatenateJS(dirPath string) []byte {
-	var js_code []byte
+	var jsCode []byte
 	// walk all files in directory
 	filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() && strings.HasSuffix(info.Name(), ".js") {
@@ -452,11 +453,11 @@ func concatenateJS(dirPath string) []byte {
 			if err != nil {
 				return err
 			}
-			js_code = append(js_code, b...)
+			jsCode = append(jsCode, b...)
 		}
 		return nil
 	})
-	return js_code
+	return jsCode
 }
 
 // HTTP Handler for "/soopayload"
@@ -481,6 +482,8 @@ func (pth *PayloadTemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 								console.log("Payload: " + payload + " has identified a service for frame: " + window.location);
 								Registry[payload].attack(headers, cookie, body);
 								return;
+							} else {
+								console.log("Payload: " + payload + " has rejected a service for frame: " + window.location);
 							}
 						})
 				}
