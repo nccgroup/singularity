@@ -435,7 +435,7 @@ const App = () => {
             };
 
             if (msg.data.status == "start") {
-                console.log("Iframe reports that attack has started");
+                console.log(`Iframe reports that attack has started: ${msg.origin}`);
                 clearInterval(fm.frame(fid).getTimer());
                 msg.source.postMessage({
                     cmd: "payload",
@@ -470,19 +470,19 @@ const App = () => {
                 document.getElementById(fid).contentWindow.postMessage({
                     cmd: "stop"
                 }, "*");
-                console.log("This resource requires HTTP authentication. Cannot access without user noticing.");
+                console.log(`This resource requires HTTP authentication. Cannot access without user noticing: ${msg.origin}`);
             }
 
             // Possibly a firewalled or closed port. Possibly a non-HTTP service.
             if (msg.data.status === "error") {
                 fm.frame(fid).incrementErrorCount();
-                console.log("error");
+                console.log(`error: ${msg.origin}`);
 
                 if (fm.frame(fid).getErrorCount() == 5) {
                     document.getElementById(fid).contentWindow.postMessage({
                         cmd: "stop"
                     }, "*");
-                    console.log("Too many errors. Stopping.");
+                    console.log(`Too many errors, stopping: ${msg.origin}`);
                 }
             }
 
@@ -526,11 +526,13 @@ const App = () => {
 }
 
 function rebindingSuccessCb(msg) {
-    console.log(`Iframe reports attack successful for ${window.location.hostname}\n${msg.data.response}`);
+    console.log(`Iframe reports attack successful for ${msg.origin}\n${msg.data.response}`);
     if ((app.getConfiguration().getAlertSuccess() !== "false") &&
         (app.getConfiguration().getType() === "manager") &&
-        (document.getElementById("payloads").value !== "payload-hook-and-control.html")) {//TKTK change name
-        alert("Attack Successful from " + document.domain + ".\n" + "Target home page contents:\n" + msg.data.response);
+        (document.getElementById("payloads").value !== "Hook and Control")) {
+        alert("Attack Successful from " + document.domain + ".\n" 
+        + "Origin: \n" + msg.origin + ".\n" 
+        + "Target home page contents:\n" + msg.data.response);
     }
 
 }

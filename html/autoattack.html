@@ -76,7 +76,7 @@
         // Set the callback on successful rebinding a frame
         // msg contains a frame msg
         configuration.rebindingSuccessFn = (msg) => {
-            console.log(`Iframe reports attack successful for ${window.location.hostname}\n${msg.data.response}`);
+            console.log(`Iframe reports attack successful for ${msg.origin}\n${msg.data.response}`);
         }
 
         //Update the Singularity app configuration

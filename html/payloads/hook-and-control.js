@@ -24,7 +24,7 @@ const HookAndControl = () => {
 
     // Invoked to determine to detect whether the rebinded service
     // is the one targetted by this payload. Must return true or false.
-    function isService(headers, cookie, body) {
+    async function isService(headers, cookie, body) {
         return false;
     }
 

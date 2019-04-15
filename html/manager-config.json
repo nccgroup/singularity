@@ -38,7 +38,7 @@
         "name": "payload-exposed-webpdb.html",
         "ports": []
     }, {
-        "name": "payload-docker.html",
+        "name": "Docker API",
         "ports": [2376]
     }, {
         "name": "Jenkins Script Console",

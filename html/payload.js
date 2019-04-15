@@ -109,7 +109,7 @@ const Rebinder = () => {
                 } else if (error.message === 'hasSingularityHeader' ||
                     error.message === 'invalidResponseLength' ||
                     error.message === 'hasToken') {
-                    console.log('DNS rebinding did not happen yet')
+                    console.log(`DNS rebinding did not happen yet: ${window.location.host}`)
                 } else if (error.message == 'requiresHttpAuthentication') {
                     console.log('This resource requires HTTP Authentication.');
                     window.parent.postMessage({
