@@ -29,7 +29,7 @@ const WebPdb = () => {
     // is the one targetted by this payload. Must return true or false.
     async function isService(headers, cookie, body) {
         let detected = false;
-        if (body.includes('<title>Backup</title>' === true)) {
+        if (body.includes('PDB Console' === true)) {
             detected = true;
         }
         return detected;
