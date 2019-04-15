@@ -35,7 +35,7 @@
         "name": "Duplicati RCE",
         "ports": [8200]
     }, {
-        "name": "payload-exposed-webpdb.html",
+        "name": "WebPDB RCE",
         "ports": []
     }, {
         "name": "Docker API",
