@@ -20,7 +20,7 @@
         "name": "payload-exposed-chrome-devtools.html",
         "ports": [9333]
     }, {
-        "name": "payload-etcd.html",
+        "name": "Etcd k/v dump",
         "ports": [2379]
     }, {
         "name": "payload-pyethapp.html",

