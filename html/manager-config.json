@@ -1,5 +1,5 @@
 {
-    "attackHostDomain": "dynamic.rebind.it",
+    "attackHostDomain": "d.rebind.it",
     "attackHostIPAddress": "xxx.xxx.xxx.xxx",
     "targetHostIPAddress": "127.0.0.1",
     "dummyPort": 4000,
