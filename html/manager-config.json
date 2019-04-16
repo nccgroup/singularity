@@ -23,7 +23,7 @@
         "name": "Etcd k/v dump",
         "ports": [2379]
     }, {
-        "name": "payload-pyethapp.html",
+        "name": "pyethapp",
         "ports": [4000]
     }, {
         "name": "Rails Console RCE",
