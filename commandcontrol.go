@@ -41,7 +41,7 @@ type hookedClientHandler struct {
 	httpProxyServerPort int
 }
 
-type templateHookedClienData struct {
+type templateHookedClientData struct {
 	Sessions            map[string]*WebsocketClientState
 	HTTPProxyServerPort int
 	Hostname            string
@@ -69,7 +69,7 @@ func (hch *hookedClientHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	host, _, err := net.SplitHostPort(r.Host)
 	check(err)
 	host = strings.Replace(host, "soohooked.", "", 1)
-	templateData := templateHookedClienData{Sessions: hch.wscss.Sessions,
+	templateData := templateHookedClientData{Sessions: hch.wscss.Sessions,
 		HTTPProxyServerPort: hch.httpProxyServerPort, Hostname: host}
 	hch.wscss.RLock()
 	err = t.Execute(w, templateData)
