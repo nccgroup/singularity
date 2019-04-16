@@ -47,17 +47,17 @@ const RailsConsoleRce = () => {
     // is the one targetted by this payload. Must return true or false.
     async function isService(headers, cookie, body) {
         return fetch("/nonexistingpage")
-        .then(function (response) {
-            return response.text()
-        })
-        .then(function (d) {
-            if (d.includes("Rails") === true) {
-                return true;
-            } else {
-                return false;
-            }
-        })
-        .catch(e => { return (false); })
+            .then(function (response) {
+                return response.text()
+            })
+            .then(function (d) {
+                if (d.includes("Rails") === true) {
+                    return true;
+                } else {
+                    return false;
+                }
+            })
+            .catch(e => { return (false); })
     }
 
     return {
