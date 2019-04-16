@@ -72,7 +72,7 @@ const ChromeDevTools = () => {
 }
 
 // Registry value and manager-config.json value must match
-Registry["Exposed Chrome DevTools RCE"] = ChromeDevTools();
+Registry["Chrome DevTools RCE"] = ChromeDevTools();
 
 
 

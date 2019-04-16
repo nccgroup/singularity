@@ -17,7 +17,7 @@
         "name": "automatic",
         "ports": []
     }, {
-        "name": "Exposed Chrome DevTools RCE",
+        "name": "Chrome DevTools RCE",
         "ports": [9333]
     }, {
         "name": "Etcd k/v dump",
@@ -26,7 +26,7 @@
         "name": "payload-pyethapp.html",
         "ports": [4000]
     }, {
-        "name": "payload-rails-webconsole.html",
+        "name": "Rails Console RCE",
         "ports": [3000]
     }, {
         "name": "AWS Metadata Exfil",
