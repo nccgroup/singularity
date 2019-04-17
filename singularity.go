@@ -255,7 +255,6 @@ func DNSRebindFromQueryMultiA(session string, dcss *DNSClientStateStore, q dns.Q
 	dcss.RLock()
 	if dcss.Sessions[session].FirewalledOnce == true {
 		// we try to prevent browsers like Chrome for reverting back to first IP address
-		// by responding with the second address only until first one expires.
 		answers = []string{dcss.Sessions[session].ResponseReboundIPAddr}
 	} else {
 		answers = []string{dcss.Sessions[session].ResponseIPAddr, dcss.Sessions[session].ResponseReboundIPAddr}
