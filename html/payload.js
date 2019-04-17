@@ -180,7 +180,9 @@ function webSocketHook(initialCookie, wsProxyPort, retry) {
             if (data.payload.fetchrequest.method === 'GET' || data.payload.fetchrequest.message === 'HEAD') {
                 delete data.payload.fetchrequest.body;
             } else {
-                data.payload.fetchrequest.body = atobUTF8(data.payload.fetchrequest.body)
+                if (data.payload.fetchrequest.body !== null) {
+                    data.payload.fetchrequest.body = atobUTF8(data.payload.fetchrequest.body)
+                }
             }
             const messageID = data.payload.fetchrequest.id
             let fetchResponse = {
