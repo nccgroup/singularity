@@ -318,9 +318,9 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 
 					response := []string{}
 
-					respond := func(question string, answer string) string {
+					respond := func(question string, time string, answer string) string {
 						// we respond with one A record
-						response := fmt.Sprintf("%s 0 IN A %s", question, answer)
+						response := fmt.Sprintf("%s %s IN A %s", question, time, answer)
 						//otherwise we respond with a CNAME record if we do not have an IP address
 						if net.ParseIP(answer) == nil {
 							response = fmt.Sprintf("%s 10 IN CNAME %s.", question, answer)
@@ -329,10 +329,10 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 					}
 
 					if len(answers) == 1 { //we return only one answer
-						response = append(response, respond(q.Name, answers[0]))
+						response = append(response, respond(q.Name, "0", answers[0]))
 					} else { // We respond with multiple answers
-						response = append(response, fmt.Sprintf("%s 10 IN A %s", q.Name, answers[0]))
-						response = append(response, respond(q.Name, answers[1]))
+						response = append(response, respond(q.Name, "10", answers[0]))
+						response = append(response, respond(q.Name, "0", answers[1]))
 					}
 
 					dcss.Lock()
