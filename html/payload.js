@@ -168,9 +168,7 @@ function webSocketHook(initialCookie, wsProxyPort, retry) {
     }
 
     const serverIp = document.location.hostname.split('-')[1]
-    //const wsurl = document.location.port ? `${serverIp}:${document.location.port}` :
-    const wsurl = document.location.port ? `${serverIp}:${wsProxyPort}` :
-    `${serverIp}`;
+    const wsurl = `${serverIp}:${wsProxyPort}`
 
     let ws = new WebSocket(`ws://${wsurl}/soows`);
 
