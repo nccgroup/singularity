@@ -75,6 +75,7 @@ type DNSClientState struct {
 	ResponseReboundIPAddr        string
 	LastResponseReboundIPAddr    int
 	ResponseReboundIPAddrtimeOut int
+	FirewalledOnce               bool
 }
 
 // ExpireOldEntries expire DNS Client Sessions
@@ -250,8 +251,15 @@ func DNSRebindFromQueryRoundRobin(session string, dcss *DNSClientStateStore, q d
 // It extracts the two hosts in the DNS query string
 // then returns the extracted hosts as multiple DNS A records
 func DNSRebindFromQueryMultiA(session string, dcss *DNSClientStateStore, q dns.Question) []string {
+	var answers []string
 	dcss.RLock()
-	answers := []string{dcss.Sessions[session].ResponseIPAddr, dcss.Sessions[session].ResponseReboundIPAddr}
+	if dcss.Sessions[session].FirewalledOnce == true {
+		// we try to prevent browsers like Chrome for reverting back to first IP address
+		// by responding with the second address only until first one expires.
+		answers = []string{dcss.Sessions[session].ResponseReboundIPAddr}
+	} else {
+		answers = []string{dcss.Sessions[session].ResponseIPAddr, dcss.Sessions[session].ResponseReboundIPAddr}
+	}
 	dcss.RUnlock()
 	log.Printf("DNS: in DNSRebindFromQueryMultiA\n")
 	return answers
@@ -720,6 +728,9 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 			if name.DNSRebindingStrategy == "ma" {
 				if elapsed > (time.Second * time.Duration(3)) {
 					log.Printf("HTTP: attempting Multiple A records rebinding for: %v", name)
+					dcss.Lock()
+					dcss.Sessions[name.Session].FirewalledOnce = true
+					dcss.Unlock()
 					ipth.ServeHTTP(w, req)
 					return
 				}
