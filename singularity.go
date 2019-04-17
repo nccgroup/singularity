@@ -51,7 +51,7 @@ type AppConfig struct {
 	RebindingFnName              string
 	ResponseReboundIPAddrtimeOut int
 	AllowDynamicHTTPServers      bool
-	HTTPProxyServerPort          int
+	WsHTTPProxyServerPort        int
 }
 
 // GenerateRandomString returns a secure random hexstring, 20 chars long
@@ -385,12 +385,12 @@ type HTTPServerStoreHandler struct {
 	Errc                    chan HTTPServerError // communicates http server errors
 	AllowDynamicHTTPServers bool
 	sync.RWMutex
-	DynamicServers      []*http.Server
-	StaticServers       []*http.Server
-	Dcss                *DNSClientStateStore
-	Wscss               *WebsocketClientStateStore
-	HTTPProxyServerPort int
-	AuthToken           string
+	DynamicServers        []*http.Server
+	StaticServers         []*http.Server
+	Dcss                  *DNSClientStateStore
+	Wscss                 *WebsocketClientStateStore
+	WsHTTPProxyServerPort int
+	AuthToken             string
 }
 
 // IPTablesHandler is a HTTP handler that adds/removes iptables rules
@@ -448,7 +448,7 @@ func concatenateJS(dirPath string) []byte {
 	// walk all files in directory
 	filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() && strings.HasSuffix(info.Name(), ".js") {
-			println("concatenating " + path + " ...")
+			log.Printf("HTTP: concatenating %v ...", path)
 			b, err := ioutil.ReadFile(path)
 			if err != nil {
 				return err
@@ -469,7 +469,7 @@ func (pth *PayloadTemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	<script>
 	{{ .JavaScriptCode }}
 
-	function attack(payload, headers, cookie, body) {
+	function attack(payload, headers, cookie, body, wsproxyport) {
 		const titleEl = document.getElementById('title');
 		if (payload === 'automatic') {
 			(async function loop() {
@@ -480,7 +480,7 @@ func (pth *PayloadTemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 							if (response === true) {
 								titleEl.innerText = payload;
 								console.log("Payload: " + payload + " has identified a service for frame: " + window.location);
-								Registry[payload].attack(headers, cookie, body);
+								Registry[payload].attack(headers, cookie, body, wsproxyport);
 								return;
 							} else {
 								console.log("Payload: " + payload + " has rejected a service for frame: " + window.location);
@@ -490,7 +490,7 @@ func (pth *PayloadTemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 			})();
 		} else {
 			titleEl.innerText = payload;
-			Registry[payload].attack(headers, cookie, body);
+			Registry[payload].attack(headers, cookie, body, wsproxyport);
 		}
 	}
 	</script></head>
@@ -691,10 +691,8 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 	dpth := &DefaultHeadersHandler{NextHandler: pth}
 	ipth := &IPTablesHandler{}
 	delayDOMLoadHandler := &DelayDOMLoadHandler{}
-	websocketHandler := &WebsocketHandler{dcss: dcss, wscss: wscss}
-	//hookedClientHandler := &hookedClientHandler{wscss: wscss, httpProxyServerPort: hss.HTTPProxyServerPort}
-	//hookedClientAuthHander := &AuthHandler{Username: "Singularity of Origin", Password: hss.BasicAuthPassword,
-	//	Realm: "Hooked Clients", NextHandler: hookedClientHandler}
+	//websocketHandler := &WebsocketHandler{dcss: dcss, wscss: wscss}
+
 	h := http.NewServeMux()
 
 	h.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
@@ -734,7 +732,7 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 	h.Handle("/soopayload.html", dpth)
 	h.Handle("/servers", hss)
 	h.Handle("/delaydomload", delayDOMLoadHandler)
-	h.Handle("/soows", websocketHandler)
+	//h.Handle("/soows", websocketHandler)
 
 	httpServer := &http.Server{Addr: ":" + strconv.Itoa(port), Handler: h}
 

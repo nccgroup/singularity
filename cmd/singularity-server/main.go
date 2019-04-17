@@ -40,8 +40,8 @@ func initFromCmdLine() *singularity.AppConfig {
 	var responseReboundIPAddrtimeOut = flag.Int("responseReboundIPAddrtimeOut", 300,
 		"Specify delay (s) for which we will keep responding with Rebound IP Address after last query. After delay, we will respond with  ResponseReboundIPAddr.")
 	var dangerouslyAllowDynamicHTTPServers = flag.Bool("dangerouslyAllowDynamicHTTPServers", false, "DANGEROUS if the flag is set (to anything). Specify if any target can dynamically request Singularity to allocate an HTTP Server on a new port.")
-	var httpProxyServerPort = flag.Int("httpProxyServerPort", 3129,
-		"Specify the attacker HTTP Proxy Server port that permits to browse hijacked client services.")
+	var WsHttpProxyServerPort = flag.Int("WsHttpProxyServerPort", 3129,
+		"Specify the attacker HTTP Proxy Server and Websockets port that permits to browse hijacked client services.")
 	flag.Var(&myArrayPortFlags, "HTTPServerPort", "Specify the attacker HTTP Server port that will serve HTML/JavaScript files. Repeat this flag to listen on more than one HTTP port.")
 
 	flag.Parse()
@@ -60,7 +60,7 @@ func initFromCmdLine() *singularity.AppConfig {
 	appConfig.ResponseReboundIPAddrtimeOut = *responseReboundIPAddrtimeOut
 	appConfig.HTTPServerPorts = myArrayPortFlags
 	appConfig.AllowDynamicHTTPServers = *dangerouslyAllowDynamicHTTPServers
-	appConfig.HTTPProxyServerPort = *httpProxyServerPort
+	appConfig.WsHTTPProxyServerPort = *WsHttpProxyServerPort
 
 	return &appConfig
 }
@@ -81,7 +81,7 @@ func main() {
 		AllowDynamicHTTPServers: appConfig.AllowDynamicHTTPServers,
 		Dcss:                    dcss,
 		Wscss:                   wscss,
-		HTTPProxyServerPort:     appConfig.HTTPProxyServerPort,
+		WsHTTPProxyServerPort:   appConfig.WsHTTPProxyServerPort,
 		AuthToken:               authToken,
 	}
 
@@ -113,11 +113,11 @@ func main() {
 
 	}
 
-	httpProxyServer := singularity.NewHTTPProxyServer(hss.HTTPProxyServerPort, dcss, wscss, hss)
-	httpProxyServerErr := singularity.StartHTTPProxyServer(httpProxyServer)
+	wsHTTPProxyServer := singularity.NewHTTPProxyServer(hss.WsHTTPProxyServerPort, dcss, wscss, hss)
+	wsHTTPProxyServerErr := singularity.StartHTTPProxyServer(wsHTTPProxyServer)
 
-	if httpProxyServerErr != nil {
-		log.Fatalf("Main: Could not start proxy HTTP Server instance: %v", httpProxyServerErr)
+	if wsHTTPProxyServerErr != nil {
+		log.Fatalf("Main: Could not start proxy Webssockets/HTTP Server instance: %v", wsHTTPProxyServerErr)
 	}
 
 	expiryDuration := time.Duration(appConfig.ResponseReboundIPAddrtimeOut) * time.Second

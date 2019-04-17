@@ -103,6 +103,7 @@ const Configuration = () => {
                     dummyPort = config.dummyPort;
                     indexToken = config.indexToken;
                     interval = config.interval;
+                    wsProxyPort = config.wsProxyPort;
                     rebindingStrategy = config.rebindingStrategy;
                     flushDns = config.flushDns;
                 })
@@ -141,6 +142,12 @@ const Configuration = () => {
         setInterval(i) {
             interval = i;
         },
+        getWsProxyPort(){
+            return wsProxyPort;
+        },
+        setWsProxyPort(port){
+            wsProxyPort = port;
+        },
         getRebindingStrategy() {
             return rebindingStrategy;
         },
@@ -159,6 +166,7 @@ const Configuration = () => {
             rebindingStrategy = configObject.rebindingStrategy;
             flushDns = configObject.flushDns;
             interval = configObject.interval;
+            wsProxyPort = configObject.wsProxyPort;
             indexToken = configObject.indexToken;
             attackPayload = configObject.attackPayload;
             hideActivity = configObject.hideActivity;
@@ -338,6 +346,7 @@ const App = () => {
         document.getElementById('dummyport').value = configuration.getDummyPort();
         document.getElementById('indextoken').value = configuration.getIndexToken();
         document.getElementById('interval').value = configuration.getInterval();
+        document.getElementById('wsproxyport').value = configuration.getWsProxyPort();
         document.getElementById(configuration.getRebindingStrategy()).selected = true;
         document.getElementById('flushdns').checked = configuration.getFlushDns();
     };
@@ -446,6 +455,10 @@ const App = () => {
                     param: configuration.getInterval()
                 }, "*");
                 msg.source.postMessage({
+                  cmd: "wsproxyport",
+                  param:  configuration.getWsProxyPort() 
+                }, "*");
+                msg.source.postMessage({
                     cmd: "indextoken",
                     param: configuration.getIndexToken()
                 }, "*");
@@ -499,6 +512,9 @@ const App = () => {
 
             const UiAttackPayloadName = document.getElementById("payloads").value;
             configuration.setAttackPayload(UiAttackPayloadName);
+
+            const UiAttackWsProxyPort = document.getElementById("wsproxyport").value;
+            configuration.setWsProxyPort(UiAttackWsProxyPort);
             
 
             let fid = fm.addFrame(hosturl

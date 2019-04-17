@@ -6,6 +6,7 @@
     "interval": 20,
     "rebindingStrategy": "fs",
     "flushDns": false,
+    "wsProxyPort": 3129,
     "indexToken": "thisismytesttoken",
     "attackPayloads": [{
         "name": "Simple Fetch Get",
