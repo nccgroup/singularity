@@ -84,7 +84,8 @@ type ProxyHandler struct {
 	Dcss  *DNSClientStateStore
 }
 
-// Custom transport to bridge Singularity reverse proxy to target via websockets
+// ProxytoWebsocketTransport is a custom transport
+// to bridge Singularity reverse proxy and target via websockets
 type ProxytoWebsocketTransport struct {
 	WSClient *WSClient
 }
@@ -236,6 +237,7 @@ func (ah *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// LoginHandler is an HTTP login handler for proxy functions
 type LoginHandler struct {
 	AuthToken string
 }
@@ -285,6 +287,7 @@ func Auth(r *http.Request) (AuthToken string, ok bool) {
 	return auth, true
 }
 
+// NewWSClient return a new websockets client
 func NewWSClient() *WSClient {
 	return &WSClient{
 		pending: make(map[uint64]*WSCall, 1),
@@ -292,8 +295,9 @@ func NewWSClient() *WSClient {
 	}
 }
 
-// http://hassansin.github.io/request-response-pattern-using-go-channles
+// Request is a method to send fetch request to the browser via websockets
 func (c *WSClient) Request(op *websocketOperation) (interface{}, error) {
+	// http://hassansin.github.io/request-response-pattern-using-go-channles
 	c.mutex.Lock()
 	id := c.counter
 	c.counter++
@@ -519,6 +523,7 @@ func (p *ProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	proxy.ServeHTTP(w, r)
 }
 
+// NewHTTPProxyServer starts a new HTTP proxy server
 func NewHTTPProxyServer(port int, dcss *DNSClientStateStore,
 	//TKTK implement TLS
 	wscss *WebsocketClientStateStore, hss *HTTPServerStoreHandler) *http.Server {
