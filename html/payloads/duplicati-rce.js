@@ -190,10 +190,15 @@ Amazon Cloud Drive & S3, Google Drive, box.com, Mega, hubiC and many others
     }
 
     // Invoked to determine to detect whether the rebinded service
-    // is the one targetted by this payload. Must return true or false.
+    // is the one targeted by this payload. Must return true or false.
     async function isService(headers, cookie, body) {
         // We do not check for version in this example
         let detected = false;
+
+        if (body === null) {
+            return detected;
+        }
+
         if ((body.includes('<title>Backup</title>') &&
         headers.get('Server') === 'Tiny WebServer') === true) {
             detected = true;
