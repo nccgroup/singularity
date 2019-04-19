@@ -20,10 +20,13 @@ Detailed documentation is on the [wiki pages](https://github.com/nccgroup/singul
 
 
 ### Singularity Manager Interface
-![Singularity Manager Interface](./screenshots/home.png)
+![Singularity Manager Interface](./rails-rce-auto.png)
 
-### Fetch a Vulnerable Application Home Page on Localhost
-![Fetch an application home page](./screenshots/payload-fetch-home.png)
+### Hook and Control a Vulnerable Application on Localhost
+![Fetch an application home page](./screenshots/hookandcontrol.png)
+
+### Automate the Scan and Compromise of All Vulnerables Applications
+![Fetch an application home page](./screenshots/hookandcontrol.png)
 
 
 ## Usage
