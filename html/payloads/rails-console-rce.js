@@ -43,7 +43,7 @@ const RailsConsoleRce = () => {
             })
     }
 
-    // Invoked to determine to detect whether the rebinded service
+    // Invoked to determine whether the rebinded service
     // is the one targeted by this payload. Must return true or false.
     async function isService(headers, cookie, body) {
         return fetch("/nonexistingpage",{
