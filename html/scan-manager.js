@@ -34,7 +34,7 @@ const ScanManager = () => {
                 final.push(s);
                 continue;
             };
-            
+
             const arr = s.split(".")
             let j = 0
             let temp = [
@@ -70,6 +70,9 @@ const ScanManager = () => {
     let index = 0;
     let workerCount = window.navigator.hardwareConcurrency || 4;
     let messageReceived = 0;
+    let targetTimeoutErrors = {};
+    let doneRescan = false;
+    let timeOut = 100;
 
     return {
         run(ipAddressSpec, portSpec, resultFn, completedFn) {
@@ -86,45 +89,93 @@ const ScanManager = () => {
                 if (lastResult != null) {
                     resultFn(lastResult);
                 };
-                if (messageReceived == targets.length) {
-                    results.sort(function (a, b) {
-                        return (b.duration - a.duration);
-                    });
-                    completedFn(results);
+
+                if (index === targets.length && messageReceived === targets.length) {
+                    const targetSizeBeforeChange = targets.length
+
+                    if (doneRescan === false) {
+                        doneRescan = true;
+                        timeOut = 3000;
+
+                        for (let target in targetTimeoutErrors) {
+                            // if not all scanned ports for a given host timed out 
+                            // (e.g. fetch error instead), then we should rescan.
+                            // Works if we scan two ports per host (one closed and one open)
+                            if (targetTimeoutErrors[target].count < portsArr.length) {
+                                targetTimeoutErrors[target].rescanports.forEach(port => {
+                                    targets.push([target, port]);
+                                })
+                            };
+                        };
+
+                        if (targetSizeBeforeChange === targets.length) {
+                            results.sort(function (a, b) {
+                                return (b.duration - a.duration);
+                            });
+                            completedFn(results);
+                            return true;
+
+                        } else {
+                            console.log(`Rescanning targets with larger timeout: ${targets.slice(index)}`);
+                            return false;
+
+                        }
+                    } else {
+                        results.sort(function (a, b) {
+                            return (b.duration - a.duration);
+                        });
+                        completedFn(results);
+                        return true;
+                    }
+                } else {
+                    return false;
+
                 }
             }
 
             for (let w of workerList) {
                 w.onmessage = function (msg) {
                     let lastResult = null;
-                    if (msg.data.error == false) {
+                    if (msg.data.error === false) {
                         results.push(msg.data);
                         lastResult = msg.data;
-                    }
-                    index++;
-                    messageReceived++;
-                    checkScanDone(lastResult);
-
-                    if (index < targets.length) {
-                        let target = {
-                            "address": targets[index][0],
-                            "port": targets[index][1]
+                    } else if (msg.data.errorReason === 'timeout') {
+                        if (msg.data.target.address in targetTimeoutErrors) {
+                            targetTimeoutErrors[msg.data.target.address].count += 1;
+                            targetTimeoutErrors[msg.data.target.address]
+                                .rescanports.push(msg.data.target.port);
+                        } else {
+                            targetTimeoutErrors[msg.data.target.address] = {
+                                count: 1,
+                                rescanports: [msg.data.target.port]
+                            };;
                         };
-                        w.postMessage(target);
+                    };
+
+                    messageReceived++;
+
+                    if (checkScanDone(lastResult) === false) {
+
+                        if (index < targets.length) {
+                            let target = {
+                                "address": targets[index][0],
+                                "port": targets[index][1]
+                            };
+                            w.postMessage({ targetdata: target, timeout: timeOut });
+                            index++;
+                        }
                     }
                 }
             }
 
-            let seeded = 0;
-
             for (let w of workerList) {
-                if (seeded < targets.length) {
+                if (index < targets.length) {
                     let target = {
                         "address": targets[index][0],
                         "port": targets[index][1]
                     };
-                    w.postMessage(target);
-                    seeded++;
+                    w.postMessage({ targetdata: target, timeout: timeOut });
+                    index++;
                 } else {
                     break;
                 }
@@ -202,11 +253,11 @@ async function getMyIpAddressesThenScan() {
 
     getLocalIpAddress()
         .then(address => {
-                const range = `${address.split('.', 3).join('.')}.1-255`;
-                addrSpec = `${addrSpec}${range}`;
-                document.getElementById("ipaddressspec").value = addrSpec;
-                sm.run(addrSpec, portSpec, resultFn, doneFn);
-            },
+            const range = `${address.split('.', 3).join('.')}.1-254`;
+            addrSpec = `${addrSpec}${range}`;
+            document.getElementById("ipaddressspec").value = addrSpec;
+            sm.run(addrSpec, portSpec, resultFn, doneFn);
+        },
             e => {
                 console.log(e);
                 addrSpec = `${addrSpec}192.168.1.1-255`;

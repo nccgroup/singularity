@@ -8,11 +8,11 @@ function timeout(ms, promise,controller) {
     })
 }
 
-function scan(targetdata) {
+function scan(targetdata, duration) {
     let sendDate = new Date().getTime();
     var controller = new AbortController();//NO IE support
     var signal = controller.signal;
-    timeout(100, fetch(`http://${targetdata.address}:${targetdata.port}/`, {
+    timeout(duration, fetch(`http://${targetdata.address}:${targetdata.port}/`, {
             mode: 'no-cors',
             credentials: 'omit',
             signal
@@ -21,6 +21,7 @@ function scan(targetdata) {
             let receiveDate = new Date().getTime();
             let result = {
                 "error": false,
+                "errorReason": null,
                 "start": sendDate,
                 "end": receiveDate,
                 "duration": (receiveDate - sendDate),
@@ -30,8 +31,10 @@ function scan(targetdata) {
         })
         .catch(function (e) {
             let receiveDate = (new Date()).getTime();
+            console.log(`Scanner: ${e.message} for ${targetdata.address}:${targetdata.port}.`);
             let result = {
                 "error": true,
+                "errorReason": e.message,
                 "start": sendDate,
                 "end": receiveDate,
                 "duration": (receiveDate - sendDate),
@@ -43,9 +46,9 @@ function scan(targetdata) {
 
 }
 
-onmessage = function (target) {
+onmessage = function (message) {
 //    console.log(`Worker: Message received from main script: ${target.data.address}:${target.data.port}`);
-    scan(target.data);
+    scan(message.data.targetdata, message.data.timeout);
  //   console.log('Worker: Posting message back to main script');
 
 }
