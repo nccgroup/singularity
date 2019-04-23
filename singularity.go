@@ -49,6 +49,7 @@ type AppConfig struct {
 	ResponseReboundIPAddrtimeOut int
 	AllowDynamicHTTPServers      bool
 	HTTPProxyServerPort          int
+	DNSServerBindAddr            string
 }
 
 // GenerateRandomString returns a secure random hexstring, 20 chars long
