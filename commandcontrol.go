@@ -37,14 +37,14 @@ type WebsocketClientState struct {
 }
 
 type hookedClientHandler struct {
-	wscss               *WebsocketClientStateStore
-	httpProxyServerPort int
+	wscss                 *WebsocketClientStateStore
+	wsHTTPProxyServerPort int
 }
 
-type templateHookedClienData struct {
-	Sessions            map[string]*WebsocketClientState
-	HTTPProxyServerPort int
-	Hostname            string
+type templateHookedClientData struct {
+	Sessions              map[string]*WebsocketClientState
+	WsHTTPProxyServerPort int
+	Hostname              string
 }
 
 func (hch *hookedClientHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -56,7 +56,7 @@ func (hch *hookedClientHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	const tpl = `
 	<!doctype html><head><meta charset=utf-8><title>Hooked WS Clients</title></head><body>
 	<h3>Hooked WS Clients</h3>
-	<ul>{{ $hostname := .Hostname }}{{ $port := .HTTPProxyServerPort}}{{ range $key, $value := .Sessions }}
+	<ul>{{ $hostname := .Hostname }}{{ $port := .WsHTTPProxyServerPort}}{{ range $key, $value := .Sessions }}
 	<li><a target="_blank" rel="noopener noreferrer" href="http://{{ $key }}.{{ $hostname }}:{{ $port }}/">{{ $key }}</a> {{ $value.Host }} {{FormatDate $value.LastSeenTime }} </li>
     {{ end }}</ul></body></html>`
 	check := func(err error) {
@@ -69,8 +69,8 @@ func (hch *hookedClientHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	host, _, err := net.SplitHostPort(r.Host)
 	check(err)
 	host = strings.Replace(host, "soohooked.", "", 1)
-	templateData := templateHookedClienData{Sessions: hch.wscss.Sessions,
-		HTTPProxyServerPort: hch.httpProxyServerPort, Hostname: host}
+	templateData := templateHookedClientData{Sessions: hch.wscss.Sessions,
+		WsHTTPProxyServerPort: hch.wsHTTPProxyServerPort, Hostname: host}
 	hch.wscss.RLock()
 	err = t.Execute(w, templateData)
 	hch.wscss.RUnlock()
@@ -84,7 +84,8 @@ type ProxyHandler struct {
 	Dcss  *DNSClientStateStore
 }
 
-// Custom transport to bridge Singularity reverse proxy to target via websockets
+// ProxytoWebsocketTransport is a custom transport
+// to bridge Singularity reverse proxy and target via websockets
 type ProxytoWebsocketTransport struct {
 	WSClient *WSClient
 }
@@ -236,6 +237,7 @@ func (ah *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// LoginHandler is an HTTP login handler for proxy functions
 type LoginHandler struct {
 	AuthToken string
 }
@@ -285,6 +287,7 @@ func Auth(r *http.Request) (AuthToken string, ok bool) {
 	return auth, true
 }
 
+// NewWSClient return a new websockets client
 func NewWSClient() *WSClient {
 	return &WSClient{
 		pending: make(map[uint64]*WSCall, 1),
@@ -292,8 +295,9 @@ func NewWSClient() *WSClient {
 	}
 }
 
-// http://hassansin.github.io/request-response-pattern-using-go-channles
+// Request is a method to send fetch request to the browser via websockets
 func (c *WSClient) Request(op *websocketOperation) (interface{}, error) {
+	// http://hassansin.github.io/request-response-pattern-using-go-channles
 	c.mutex.Lock()
 	id := c.counter
 	c.counter++
@@ -519,18 +523,23 @@ func (p *ProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	proxy.ServeHTTP(w, r)
 }
 
+// NewHTTPProxyServer starts a new HTTP proxy server
 func NewHTTPProxyServer(port int, dcss *DNSClientStateStore,
 	//TKTK implement TLS
 	wscss *WebsocketClientStateStore, hss *HTTPServerStoreHandler) *http.Server {
 	proxyHandler := &ProxyHandler{Dcss: dcss, Wscss: wscss}
 	proxyLoginHandler := &LoginHandler{AuthToken: hss.AuthToken}
 	proxyAuthHandler := &AuthHandler{NextHandler: proxyHandler}
-	//h := http.NewServeMux()
-	hookedClientHandler := &hookedClientHandler{wscss: wscss, httpProxyServerPort: hss.HTTPProxyServerPort}
+
+	hookedClientHandler := &hookedClientHandler{wscss: wscss, wsHTTPProxyServerPort: hss.WsHTTPProxyServerPort}
 	hookedClientAuthHandler := &AuthHandler{NextHandler: hookedClientHandler}
 
+	websocketHandler := &WebsocketHandler{dcss: dcss, wscss: wscss}
+
 	router := mux.NewRouter()
-	// Only matches if domain is "www.example.com".
+
+	router.Handle("/soows", websocketHandler)
+
 	// Matches a dynamic subdomain.
 	hookedSubRouter := router.Host(`{hookedSubRouter:soohooked.*}`).Subrouter()
 	hookedSubRouter.Handle("/login", proxyLoginHandler).Methods("GET", "POST")
@@ -555,7 +564,7 @@ func StartHTTPProxyServer(s *http.Server) error {
 	}
 
 	go func() {
-		log.Printf("HTTP: starting HTTP Proxy Server on %v\n", s.Addr)
+		log.Printf("HTTP: starting HTTP Websockets/Proxy Server on %v\n", s.Addr)
 		s.Serve(l)
 		//hss.Errc <- HTTPServerError{Err: routineErr, Port: s.Addr}
 	}()

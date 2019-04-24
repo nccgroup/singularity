@@ -53,7 +53,7 @@ func (ipt *IPTablesRule) makeAndRunRule(command string) {
 		"--source", ipt.srcAddr, //"--sport" srcPortRange,
 		"--destination", ipt.dstAddr, "--destination-port", ipt.dstPort)
 	err := rule.Run()
-	log.Printf("Firewall: `iptables` finished with error: %v", err)
+	log.Printf("Firewall: `iptables` finished with return code: %v", err)
 }
 
 //AddRule adds an iptables rule in Linux iptable

