@@ -72,7 +72,7 @@ const ScanManager = () => {
     let messageReceived = 0;
     let targetTimeoutErrors = {};
     let doneRescan = false;
-    let timeOut = 100;
+    let timeOut = 300;
 
     return {
         run(ipAddressSpec, portSpec, resultFn, completedFn) {
