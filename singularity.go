@@ -51,6 +51,7 @@ type AppConfig struct {
 	RebindingFnName              string
 	ResponseReboundIPAddrtimeOut int
 	AllowDynamicHTTPServers      bool
+	DNSServerBindAddr            string
 	WsHTTPProxyServerPort        int
 }
 

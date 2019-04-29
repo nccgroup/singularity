@@ -43,6 +43,7 @@ func initFromCmdLine() *singularity.AppConfig {
 	var WsHttpProxyServerPort = flag.Int("WsHttpProxyServerPort", 3129,
 		"Specify the attacker HTTP Proxy Server and Websockets port that permits to browse hijacked client services.")
 	flag.Var(&myArrayPortFlags, "HTTPServerPort", "Specify the attacker HTTP Server port that will serve HTML/JavaScript files. Repeat this flag to listen on more than one HTTP port.")
+	var dnsServerBindAddr = flag.String("DNSServerBindAddr", "0.0.0.0", "Specify the IP address the DNS server will bind to, defaults to 0.0.0.0")
 
 	flag.Parse()
 	flagset := make(map[string]bool)
@@ -60,6 +61,7 @@ func initFromCmdLine() *singularity.AppConfig {
 	appConfig.ResponseReboundIPAddrtimeOut = *responseReboundIPAddrtimeOut
 	appConfig.HTTPServerPorts = myArrayPortFlags
 	appConfig.AllowDynamicHTTPServers = *dangerouslyAllowDynamicHTTPServers
+	appConfig.DNSServerBindAddr = *dnsServerBindAddr
 	appConfig.WsHTTPProxyServerPort = *WsHttpProxyServerPort
 
 	return &appConfig
@@ -90,7 +92,7 @@ func main() {
 
 	// Start DNS server
 	dnsServerPort := 53
-	dnsServer := &dns.Server{Addr: ":" + strconv.Itoa(dnsServerPort), Net: "udp"}
+	dnsServer := &dns.Server{Addr: appConfig.DNSServerBindAddr + ":" + strconv.Itoa(dnsServerPort), Net: "udp"}
 	log.Printf("Main: Starting DNS Server at %v\n", dnsServerPort)
 
 	go func() {
