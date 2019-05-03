@@ -719,22 +719,23 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 		log.Printf("HTTP: %v %v from %v", req.Method, req.RequestURI, req.RemoteAddr)
 
 		name, err := NewDNSQuery(req.Host)
+		var ok bool
 		if err == nil {
 
-			dcss.RLock()
-			elapsed := time.Now().Sub(dcss.Sessions[name.Session].CurrentQueryTime)
-			dcss.RUnlock()
+			dcss.Lock()
+			if _, ok = dcss.Sessions[name.Session]; ok {
+				elapsed := time.Now().Sub(dcss.Sessions[name.Session].CurrentQueryTime)
 
-			if name.DNSRebindingStrategy == "ma" {
-				if elapsed > (time.Second * time.Duration(3)) {
-					log.Printf("HTTP: attempting Multiple A records rebinding for: %v", name)
-					dcss.Lock()
-					dcss.Sessions[name.Session].FirewalledOnce = true
-					dcss.Unlock()
-					ipth.ServeHTTP(w, req)
-					return
+				if name.DNSRebindingStrategy == "ma" {
+					if elapsed > (time.Second * time.Duration(3)) {
+						log.Printf("HTTP: attempting Multiple A records rebinding for: %v", name)
+						dcss.Sessions[name.Session].FirewalledOnce = true
+						ipth.ServeHTTP(w, req)
+						return
+					}
 				}
 			}
+			dcss.Unlock()
 		}
 		d.ServeHTTP(w, req)
 	})
