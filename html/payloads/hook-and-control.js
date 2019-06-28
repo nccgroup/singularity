@@ -19,7 +19,7 @@ const HookAndControl = () => {
         };
 
         // establish ws connection to Singularity server
-			webSocketHook(cookie, wsProxyPort, 10);
+			webSocketHook(headers, cookie, wsProxyPort, 10);
     }
 
     // Invoked to determine whether the rebinded service
