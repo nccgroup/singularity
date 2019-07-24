@@ -93,6 +93,13 @@
         //   * a CNAME such as "jenkins.internal-organization-domain.local"
         let addrSpec = `127.0.0.1,0.0.0.0`;
 
+        // Specify whether Singularity should search for and attack more addresses
+        // that may be accessible by the target browser, *in addition* to the above targets.
+        // Further targets are currently discovered using:
+        //  - WebRTC address leak when available, and inference of the private net. addresses range
+        //  - detection of target router's external address
+        let searchForMoreAddresses = true;
+
         // Specify a port range to scan and attack
         // WARNING: You must ensure that Singularity listens on all these ports at startup for now.
         const portSpec = '80,8080-8082,2376,8200,3000,4000,2379,9333';
@@ -142,8 +149,15 @@
 
                     })
         }
+
         // and go!
-        getLocalIpAddressesThenScan();
+
+        if (searchForMoreAddresses === true) {
+            getLocalIpAddressesThenScan();
+        } else {
+            sm = ScanManager();
+            sm.run(`${addrSpec}`, portSpec, scanFoundNewTargetCb, scanDoneCb);
+        }
     </script>
 
     <h3>Scanning Progress</h3>
