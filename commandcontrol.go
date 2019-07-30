@@ -59,22 +59,34 @@ func (hch *hookedClientHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	<ul>{{ $hostname := .Hostname }}{{ $port := .WsHTTPProxyServerPort}}{{ range $key, $value := .Sessions }}
 	<li><a target="_blank" rel="noopener noreferrer" href="http://{{ $key }}.{{ $hostname }}:{{ $port }}/">{{ $key }}</a> {{ $value.Host }} {{FormatDate $value.LastSeenTime }} </li>
     {{ end }}</ul></body></html>`
-	check := func(err error) {
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
 	t, err := template.New("webpage").Funcs(funcMap).Parse(tpl)
-	check(err)
+
+	if err != nil {
+		log.Printf("hookedClientHandler: could not parse template: %v\n", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
 	host, _, err := net.SplitHostPort(r.Host)
-	check(err)
+
+	if err != nil {
+		log.Printf("hookedClientHandler: could not parse host: %v\n", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
 	host = strings.Replace(host, "soohooked.", "", 1)
 	templateData := templateHookedClientData{Sessions: hch.wscss.Sessions,
 		WsHTTPProxyServerPort: hch.wsHTTPProxyServerPort, Hostname: host}
 	hch.wscss.RLock()
 	err = t.Execute(w, templateData)
 	hch.wscss.RUnlock()
-	check(err)
+
+	if err != nil {
+		log.Printf("hookedClientHandler: could not execute template: %v\n", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
 
 }
 
@@ -245,7 +257,9 @@ type LoginHandler struct {
 func (lh *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	proxiedURL, err := url.Parse(r.RequestURI)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("LoginHandler: could not parse url: %v\n", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
 	}
 	url := proxiedURL.RequestURI()
 	log.Printf("Proxy: %v %v%v\n", r.Method, r.Host, url)
@@ -480,7 +494,9 @@ func (p *ProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	proxiedURL, err := url.Parse(r.RequestURI)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("ProxyHandler: could not parse url: %v\n", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
 	}
 
 	url := proxiedURL.RequestURI()

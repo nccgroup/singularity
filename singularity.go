@@ -507,16 +507,19 @@ func (pth *PayloadTemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	<span id='payloadstatus'></span></p>
 	</body></html>`
 
-	check := func(err error) {
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
 	t, err := template.New("webpage").Parse(tpl)
-	check(err)
+	if err != nil {
+		log.Printf("PayloadTemplateHandler: could not parse template: %v\n", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
 	templateData := templatePayloadData{JavaScriptCode: template.JS(concatenateJS("html/payloads"))}
 	err = t.Execute(w, templateData)
-	check(err)
+	if err != nil {
+		log.Printf("PayloadTemplateHandler: could not execute template: %v\n", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
 }
 
 // HTTP Handler for /servers
