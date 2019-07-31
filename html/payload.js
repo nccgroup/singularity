@@ -68,6 +68,15 @@ const Rebinder = () => {
         })
             .then(function (r) {
 
+                let headerCount = 0;
+                for (let pair of r.headers.entries()) {
+                    headerCount += 1;
+                };
+
+                if (headerCount === 0) {
+                    throw new Error('invalidHeaderCount');
+                }
+
                 if (r.headers.get('X-Singularity-Of-Origin') === 't') {
                     throw new Error('hasSingularityHeader');
                 }
@@ -114,7 +123,8 @@ const Rebinder = () => {
                     }, "*");
                 } else if (error.message === 'hasSingularityHeader' ||
                     error.message === 'invalidResponseLength' ||
-                    error.message === 'hasToken') {
+                    error.message === 'hasToken' ||
+                    error.message === 'invalidHeaderCount') {
                     console.log(`DNS rebinding did not happen yet: ${window.location.host}`)
                 } else if (error.message == 'requiresHttpAuthentication') {
                     console.log('This resource requires HTTP Authentication.');
@@ -172,7 +182,7 @@ function webSocketHook(headers, initialCookie, wsProxyPort, retry) {
 
     // Did successful rebinding request required HTTP Auth?
     if (headers.get('www-authenticate') !== null) {
-        httpAuth = true; 
+        httpAuth = true;
     };
 
     let ws = new WebSocket(`ws://${wsurl}/soows`);
