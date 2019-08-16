@@ -22,7 +22,7 @@ Detailed documentation is on the [wiki pages](https://github.com/nccgroup/singul
 ### Singularity Manager Interface
 ![Singularity Manager Interface](./screenshots/rails-rce-auto.png)
 
-### Hook and Control a Vulnerable Application on Localhost
+### Hook and Control a Vulnerable Application on Localhost or Other Hosts
 ![Fetch an application home page](./screenshots/hookandcontrol.png)
 
 ### Automate the Scan and Compromise of All Vulnerables Applications
