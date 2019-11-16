@@ -5,6 +5,9 @@ The exploit performs two RPC requests:
 - / : Get request to / to get the web console session ID
 - /__web_console/repl_sessions/{SESSION-ID} : PUT request to run the calculator app for a proof of concept
 The default RPC port for the rails web console is TCP 3000 (127.0.0.1:3000)
+
+Note: Ruby on Rails 6.0, released in August 2019, protects against DNS rebinding attacks in its default configuration.
+https://edgeguides.rubyonrails.org/6_0_release_notes.html#railties-notable-changes
 **/
 
 const RailsConsoleRce = () => {
