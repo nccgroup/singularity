@@ -1,7 +1,7 @@
 # Singularity of Origin
 
-NEW! Check out our DEF CON 27 and BSIDESLV presentation at [State of DNS Rebinding: Attack & Prevention Techniques and
-the Singularity of Origin](https://media.defcon.org/DEF%20CON%2027/DEF%20CON%2027%20presentations/DEFCON-27-Gerald-Doussot-Roger-Meyer-State-of-DNS-Rebinding-Attack-and-Prevention-Techniques-and-the-Singularity-of-Origin.pdf)
+NEW! Check out our [DEF CON 27 video](https://youtu.be/y9-0lICNjOQ) and BSidesLV presentation at [State of DNS Rebinding: Attack & Prevention Techniques and
+the Singularity of Origin](https://bit.ly/Singularity_Defcon27)
 
 `Singularity of Origin` is a tool to perform [DNS rebinding](https://en.wikipedia.org/wiki/DNS_rebinding) attacks.
 It includes the necessary components to rebind the IP address of the attack server DNS name to the target machine's IP address and to serve attack payloads to exploit vulnerable software on the target machine. 
