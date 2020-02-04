@@ -1,6 +1,7 @@
 # Singularity of Origin
 
 NEW! The WebRTC leak, which permitted to obtain the internal IP address of a target machine has been fixed in recent version of Google Chrome and Apple Safari. It still works on Firefox.
+
 NEW! Check out our [DEF CON 27 video](https://youtu.be/y9-0lICNjOQ) and BSidesLV presentation at [State of DNS Rebinding: Attack & Prevention Techniques and
 the Singularity of Origin](https://bit.ly/Singularity_Defcon27)
 
