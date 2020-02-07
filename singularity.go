@@ -1,6 +1,7 @@
 package singularity
 
 import (
+	"context"
 	crand "crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -17,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/miekg/dns"
@@ -772,13 +774,26 @@ type HTTPServerError struct {
 	Port string
 }
 
+// Linux Transparent Proxy Support
+// https://www.kernel.org/doc/Documentation/networking/tproxy.txt
+// e.g. `sudo iptables -t mangle -I PREROUTING -d ext_ip_address
+// -p tcp --dport 8080 -j TPROXY --on-port=80 --on-ip=ext_ip_address
+// will redirect external port 8080 on port 80 of Singularity
+func useIPTransparent(network, address string, conn syscall.RawConn) error {
+	return conn.Control(func(descriptor uintptr) {
+		syscall.SetsockoptInt(int(descriptor), syscall.IPPROTO_IP, syscall.IP_TRANSPARENT, 1)
+	})
+}
+
 // StartHTTPServer starts an HTTP server
 // and adds it to  dynamic (if dynamic is true) or static HTTP Store
 func StartHTTPServer(s *http.Server, hss *HTTPServerStoreHandler, dynamic bool) error {
 
 	var err error
 
-	l, err := net.Listen("tcp", s.Addr)
+	listenConfig := &net.ListenConfig{Control: useIPTransparent}
+
+	l, err := listenConfig.Listen(context.Background(), "tcp", s.Addr)
 	if err != nil {
 		return err
 	}
