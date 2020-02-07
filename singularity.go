@@ -55,6 +55,7 @@ type AppConfig struct {
 	AllowDynamicHTTPServers      bool
 	DNSServerBindAddr            string
 	WsHTTPProxyServerPort        int
+	EnableLinuxTProxySupport     bool
 }
 
 // GenerateRandomString returns a secure random hexstring, 20 chars long
@@ -605,7 +606,7 @@ func (hss *HTTPServerStoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		hss.Unlock()
 
 		httpServer := NewHTTPServer(port, hss, hss.Dcss, hss.Wscss)
-		httpServerErr := StartHTTPServer(httpServer, hss, true)
+		httpServerErr := StartHTTPServer(httpServer, hss, true, false)
 
 		if httpServerErr != nil {
 			http.Error(w, emptyResponseStr, 400)
@@ -787,13 +788,17 @@ func useIPTransparent(network, address string, conn syscall.RawConn) error {
 
 // StartHTTPServer starts an HTTP server
 // and adds it to  dynamic (if dynamic is true) or static HTTP Store
-func StartHTTPServer(s *http.Server, hss *HTTPServerStoreHandler, dynamic bool) error {
+func StartHTTPServer(s *http.Server, hss *HTTPServerStoreHandler, dynamic bool, tproxy bool) error {
 
 	var err error
+	var l net.Listener
 
-	listenConfig := &net.ListenConfig{Control: useIPTransparent}
-
-	l, err := listenConfig.Listen(context.Background(), "tcp", s.Addr)
+	if tproxy == true {
+		listenConfig := &net.ListenConfig{Control: useIPTransparent}
+		l, err = listenConfig.Listen(context.Background(), "tcp", s.Addr)
+	} else {
+		l, err = net.Listen("tcp", s.Addr)
+	}
 	if err != nil {
 		return err
 	}
