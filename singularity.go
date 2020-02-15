@@ -1,6 +1,7 @@
 package singularity
 
 import (
+	"context"
 	crand "crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -17,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/miekg/dns"
@@ -53,6 +55,7 @@ type AppConfig struct {
 	AllowDynamicHTTPServers      bool
 	DNSServerBindAddr            string
 	WsHTTPProxyServerPort        int
+	EnableLinuxTProxySupport     bool
 }
 
 // GenerateRandomString returns a secure random hexstring, 20 chars long
@@ -603,7 +606,7 @@ func (hss *HTTPServerStoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		hss.Unlock()
 
 		httpServer := NewHTTPServer(port, hss, hss.Dcss, hss.Wscss)
-		httpServerErr := StartHTTPServer(httpServer, hss, true)
+		httpServerErr := StartHTTPServer(httpServer, hss, true, false)
 
 		if httpServerErr != nil {
 			http.Error(w, emptyResponseStr, 400)
@@ -772,13 +775,30 @@ type HTTPServerError struct {
 	Port string
 }
 
+// Linux Transparent Proxy Support
+// https://www.kernel.org/doc/Documentation/networking/tproxy.txt
+// e.g. `sudo iptables -t mangle -I PREROUTING -d ext_ip_address
+// -p tcp --dport 8080 -j TPROXY --on-port=80 --on-ip=ext_ip_address
+// will redirect external port 8080 on port 80 of Singularity
+func useIPTransparent(network, address string, conn syscall.RawConn) error {
+	return conn.Control(func(descriptor uintptr) {
+		syscall.SetsockoptInt(int(descriptor), syscall.IPPROTO_IP, syscall.IP_TRANSPARENT, 1)
+	})
+}
+
 // StartHTTPServer starts an HTTP server
 // and adds it to  dynamic (if dynamic is true) or static HTTP Store
-func StartHTTPServer(s *http.Server, hss *HTTPServerStoreHandler, dynamic bool) error {
+func StartHTTPServer(s *http.Server, hss *HTTPServerStoreHandler, dynamic bool, tproxy bool) error {
 
 	var err error
+	var l net.Listener
 
-	l, err := net.Listen("tcp", s.Addr)
+	if tproxy == true {
+		listenConfig := &net.ListenConfig{Control: useIPTransparent}
+		l, err = listenConfig.Listen(context.Background(), "tcp", s.Addr)
+	} else {
+		l, err = net.Listen("tcp", s.Addr)
+	}
 	if err != nil {
 		return err
 	}

@@ -42,6 +42,7 @@ func initFromCmdLine() *singularity.AppConfig {
 	var dangerouslyAllowDynamicHTTPServers = flag.Bool("dangerouslyAllowDynamicHTTPServers", false, "DANGEROUS if the flag is set (to anything). Specify if any target can dynamically request Singularity to allocate an HTTP Server on a new port.")
 	var WsHttpProxyServerPort = flag.Int("WsHttpProxyServerPort", 3129,
 		"Specify the attacker HTTP Proxy Server and Websockets port that permits to browse hijacked client services.")
+	var enableLinuxTProxySupport = flag.Bool("enableLinuxTProxySupport", false, "Specify whether to enable Linux TProxy support or not. Useful to listen on many ports with an appropriate iptables configuration.")
 	flag.Var(&myArrayPortFlags, "HTTPServerPort", "Specify the attacker HTTP Server port that will serve HTML/JavaScript files. Repeat this flag to listen on more than one HTTP port.")
 	var dnsServerBindAddr = flag.String("DNSServerBindAddr", "0.0.0.0", "Specify the IP address the DNS server will bind to, defaults to 0.0.0.0")
 
@@ -63,6 +64,7 @@ func initFromCmdLine() *singularity.AppConfig {
 	appConfig.AllowDynamicHTTPServers = *dangerouslyAllowDynamicHTTPServers
 	appConfig.DNSServerBindAddr = *dnsServerBindAddr
 	appConfig.WsHTTPProxyServerPort = *WsHttpProxyServerPort
+	appConfig.EnableLinuxTProxySupport = *enableLinuxTProxySupport
 
 	return &appConfig
 }
@@ -107,7 +109,7 @@ func main() {
 	for _, port := range appConfig.HTTPServerPorts {
 		// Start HTTP Servers
 		httpServer := singularity.NewHTTPServer(port, hss, dcss, wscss)
-		httpServerErr := singularity.StartHTTPServer(httpServer, hss, false)
+		httpServerErr := singularity.StartHTTPServer(httpServer, hss, false, appConfig.EnableLinuxTProxySupport)
 
 		if httpServerErr != nil {
 			log.Fatalf("Main: Could not start main HTTP Server instance: %v", httpServerErr)
