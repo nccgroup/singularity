@@ -298,17 +298,13 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 					log.Printf("DNS: Parsed query: %v, error: %v\n", name, err)
 
 					if err != nil {
-						// We could not parse the query, set default response settings
-						clientState.ResponseIPAddr = appConfig.ResponseIPAddr
-						clientState.ResponseReboundIPAddr = appConfig.ResponseReboundIPAddr
-						// Strategy is to return clientState.ResponseIPAddr
-						rebindingFn = dnsRebindFirst
-					} else {
-						clientState.ResponseIPAddr = name.ResponseIPAddr
-						clientState.ResponseReboundIPAddr = name.ResponseReboundIPAddr
-						if fn, ok := DNSRebindingStrategy[name.DNSRebindingStrategy]; ok {
-							rebindingFn = fn
-						}
+						return
+					}
+
+					clientState.ResponseIPAddr = name.ResponseIPAddr
+					clientState.ResponseReboundIPAddr = name.ResponseReboundIPAddr
+					if fn, ok := DNSRebindingStrategy[name.DNSRebindingStrategy]; ok {
+						rebindingFn = fn
 					}
 
 					dcss.Lock()
