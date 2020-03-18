@@ -73,6 +73,7 @@ func GenerateRandomString() (string, error) {
 
 // DNSClientState holds the current rebinding state of client.
 type DNSClientState struct {
+	FirstQueryTime               time.Time
 	LastQueryTime                time.Time
 	CurrentQueryTime             time.Time
 	ResponseIPAddr               string
@@ -290,6 +291,7 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 					log.Printf("DNS: Received A query: %v from: %v\n", q.Name, w.RemoteAddr().String())
 
 					// Preparing to update the client DNS query state
+					clientState.FirstQueryTime = now
 					clientState.CurrentQueryTime = now
 					clientState.ResponseReboundIPAddrtimeOut = appConfig.ResponseReboundIPAddrtimeOut
 
@@ -730,7 +732,7 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 
 			if keyExists == true {
 				dcss.RLock()
-				elapsed := time.Now().Sub(dcss.Sessions[name.Session].CurrentQueryTime)
+				elapsed := time.Now().Sub(dcss.Sessions[name.Session].FirstQueryTime)
 				dcss.RUnlock()
 
 				if name.DNSRebindingStrategy == "ma" {
