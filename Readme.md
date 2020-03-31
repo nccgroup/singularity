@@ -1,5 +1,7 @@
 # Singularity of Origin
 
+NEW (2020-03-30): New blog post investigating the [impact of DoH on DNS rebinding attacks](https://research.nccgroup.com/2020/03/30/impact-of-dns-over-https-doh-on-dns-rebinding-attacks/). TL;DR: DoH (DNS over HTTPS) has no effect on rebinding attacks and protections advertised by providers can be bypassed.
+
 NEW! The WebRTC leak, which permitted to obtain the internal IP address of a target machine has been fixed in recent version of Google Chrome and Apple Safari. It still works on Firefox.
 
 NEW! Check out our [DEF CON 27 video](https://youtu.be/y9-0lICNjOQ) and BSidesLV presentation at [State of DNS Rebinding: Attack & Prevention Techniques and
