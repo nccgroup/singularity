@@ -297,11 +297,13 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 
 					var err error
 					name, err = NewDNSQuery(q.Name)
-					log.Printf("DNS: Parsed query: %v, error: %v\n", name, err)
 
 					if err != nil {
+						log.Printf("DNS: Parsing of query failed: %v, with error: %v\n", name, err)
 						return
 					}
+
+					log.Printf("DNS: Parsed query: %v\n", name)
 
 					clientState.ResponseIPAddr = name.ResponseIPAddr
 					clientState.ResponseReboundIPAddr = name.ResponseReboundIPAddr
