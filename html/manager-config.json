@@ -44,5 +44,8 @@
     }, {
         "name": "Jenkins Script Console",
         "ports": [8080]
+    }, {
+        "name": "H2 Log4Shell RCE",
+        "ports": [8082]
     }]
 }
