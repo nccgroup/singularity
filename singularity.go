@@ -27,7 +27,7 @@ import (
 
 /*** General Stuff ***/
 
-//DNSRebindingStrategy maps a DNS Rebinding strategy name to a function
+// DNSRebindingStrategy maps a DNS Rebinding strategy name to a function
 var DNSRebindingStrategy = map[string]func(session string, dcss *DNSClientStateStore, q dns.Question) []string{
 	"rr": DNSRebindFromQueryRoundRobin,
 	"fs": DNSRebindFromQueryFirstThenSecond,
@@ -116,6 +116,8 @@ type DNSQuery struct {
 // then each of these "-" must be escaped with another "-"
 func NewDNSQuery(qname string) (*DNSQuery, error) {
 	name := new(DNSQuery)
+
+	qname = strings.ToLower(qname) // DNS-0x20 work-around
 
 	qname = strings.Replace(qname, "--", "_", -1)
 
@@ -453,7 +455,7 @@ func (hcih *HTTPClientInfoHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-//https://siongui.github.io/2016/03/06/go-concatenate-js-files/
+// https://siongui.github.io/2016/03/06/go-concatenate-js-files/
 func concatenateJS(dirPath string) []byte {
 	var jsCode []byte
 	// walk all files in directory
