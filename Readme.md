@@ -4,7 +4,7 @@ Recent updates:
 
 - NEW (2023-04-27): Check out our blog post documenting the [state of DNS rebinding for April 2023](https://research.nccgroup.com/2023/04/27/state-of-dns-rebinding-in-2023/). We describe Local Network Access, a new draft W3C specification currently implemented in some browsers that aims to prevent DNS rebinding, and show two ways to bypass these restrictions. We also discuss the effects of WebRTC IP address leak mitigation, and DNS Bit 0x20 on DNS rebinding attacks.
 
-- (2020-03-30): New blog post investigating the [impact of DoH on DNS rebinding attacks](https://research.nccgroup.com/2020/03/30/impact-of-dns-over-https-doh-on-dns-rebinding-attacks/). TL;DR: DoH (DNS over HTTPS) has no effect on rebinding attacks and protections advertised by providers can be bypassed.
+- (2020-03-30) New blog post investigating the [impact of DoH on DNS rebinding attacks](https://research.nccgroup.com/2020/03/30/impact-of-dns-over-https-doh-on-dns-rebinding-attacks/). TL;DR: DoH (DNS over HTTPS) has no effect on rebinding attacks and protections advertised by providers can be bypassed.
 
 - Check out our [DEF CON 27 video](https://youtu.be/y9-0lICNjOQ) and BSidesLV presentation at [State of DNS Rebinding: Attack & Prevention Techniques and
 the Singularity of Origin](https://bit.ly/Singularity_Defcon27).
