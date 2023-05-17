@@ -292,6 +292,28 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 				case dns.TypeA:
 					log.Printf("DNS: Received A query: %v from: %v\n", q.Name, w.RemoteAddr().String())
 
+					if !strings.HasPrefix(q.Name, "s-") {
+
+						// Handling query with potential QNAME minimization
+
+						if net.ParseIP(appConfig.ResponseIPAddr) == nil {
+							// DNS: Singularity external IP address apparently not configured or misconfigured
+							// (`-responseIPAddr` command line flag). Ignoring query.
+							return
+						}
+
+						response := fmt.Sprintf("%s %s IN A %s", q.Name, "0", appConfig.ResponseIPAddr)
+
+						rr, err := dns.NewRR(response)
+						if err == nil {
+							m.Answer = append(m.Answer, rr)
+							log.Printf("DNS: response: %v %v\n", response, q.Name)
+							w.WriteMsg(m)
+							return
+						}
+
+					}
+
 					// Preparing to update the client DNS query state
 					clientState.FirstQueryTime = now
 					clientState.CurrentQueryTime = now
