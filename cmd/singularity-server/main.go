@@ -33,8 +33,8 @@ func initFromCmdLine() *singularity.AppConfig {
 	var appConfig = singularity.AppConfig{}
 	var myArrayPortFlags arrayPortFlags
 
-	var responseIPAddr = flag.String("ResponseIPAddr", "192.168.0.1",
-		"Specify the attacker host IP address that will be rebound to the victim host address using strategy specified by flag \"-DNSRebingStrategy\"")
+	var responseIPAddr = flag.String("ResponseIPAddr", "unconfigured",
+		"Specify the attacker host external IP address that will be used for default DNS responses. Useful for handling QNAME Minimization.")
 	var responseReboundIPAddr = flag.String("ResponseReboundIPAddr", "127.0.0.1",
 		"Specify the victim host IP address that is rebound from the attacker host address")
 	var responseReboundIPAddrtimeOut = flag.Int("responseReboundIPAddrtimeOut", 300,
