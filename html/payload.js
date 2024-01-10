@@ -74,6 +74,8 @@ const Rebinder = () => {
         });
     };
 
+    // iframe method based on research from Daniel Thatcher
+    // https://www.intruder.io/research/split-second-dns-rebinding-in-chrome-and-safari
     function onChildFrameLoad() {
         console.log('payload.js: onChildFrameLoad');
         let doc = document.getElementById('childFrame').contentDocument || document.getElementById('childFrame').contentWindow.document;
