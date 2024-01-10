@@ -5,6 +5,7 @@
     "dummyPort": 4000,
     "interval": 20,
     "rebindingStrategy": "fs",
+    "attackMethod": "fetch",
     "flushDns": false,
     "wsProxyPort": 3129,
     "indexToken": "thisismytesttoken",

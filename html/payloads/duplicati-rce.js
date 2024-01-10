@@ -40,7 +40,7 @@ Amazon Cloud Drive & S3, Google Drive, box.com, Mega, hubiC and many others
             (function fetchRestoreJobStatus() {
                 headers.delete("content-type");
                 headers.append("content-type", "application/json");
-                fetch(`/api/v1/task/${taskId}`, {
+                sooFetch(`/api/v1/task/${taskId}`, {
                     method: 'GET',
                     credentials: 'include',
                     headers: headers,
@@ -119,7 +119,7 @@ Amazon Cloud Drive & S3, Google Drive, box.com, Mega, hubiC and many others
         }
 
         /* Fetch cookie/CSRF token */
-        fetch('/', {
+        sooFetch('/', {
                 credentials: 'include',
             })
             .then(responseOKOrFail("Could not submit a request to restore a backup"))
@@ -131,7 +131,7 @@ Amazon Cloud Drive & S3, Google Drive, box.com, Mega, hubiC and many others
                     .split('=');
                 myHeaders.append("X-XSRF-Token", unescape(array[1]));
                 myHeaders.append("content-type", "application/json");
-                return fetch('/api/v1/backups?temporary=true', {
+                return sooFetch('/api/v1/backups?temporary=true', {
                     method: 'POST',
                     credentials: 'include',
                     headers: myHeaders,
@@ -143,7 +143,7 @@ Amazon Cloud Drive & S3, Google Drive, box.com, Mega, hubiC and many others
                 let rr = JSON.parse(restoreData);
                 myHeaders.delete("content-type");
                 myHeaders.append("content-type", "application/x-www-form-urlencoded;charset=UTF-8");
-                return fetch(`/api/v1/backup/${rr.ID}/restore`, {
+                return sooFetch(`/api/v1/backup/${rr.ID}/restore`, {
                     method: 'POST',
                     credentials: 'include',
                     headers: myHeaders,
@@ -163,7 +163,7 @@ Amazon Cloud Drive & S3, Google Drive, box.com, Mega, hubiC and many others
                 myHeaders.delete("content-type");
                 myHeaders.append("content-type",
                     "application/json");
-                return fetch(
+                return sooFetch(
                     "/api/v1/backups", {
                         method: 'POST',
                         credentials: 'include',
@@ -176,7 +176,7 @@ Amazon Cloud Drive & S3, Google Drive, box.com, Mega, hubiC and many others
 
                 /* Run configured backup + RCE */
                 job = JSON.parse(d);
-                return fetch(`/api/v1/backup/${job.ID}/run`, {
+                return sooFetch(`/api/v1/backup/${job.ID}/run`, {
                     method: 'POST',
                     credentials: 'include',
                     headers: myHeaders,

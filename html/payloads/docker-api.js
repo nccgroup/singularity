@@ -19,13 +19,13 @@ const DockerApi = () => {
         let data = null;
         let containerID = null;
         /* Send a POST request to /images/create to pull the latest alpine image */
-        fetch('/images/create?fromImage=alpine:latest', {
+        sooFetch('/images/create?fromImage=alpine:latest', {
             method: 'POST'
         })
             .then(function (response) {
                 console.log("Successfully pulled the lastest alpine image");
 
-                return fetch(`/containers/create`, {
+                return sooFetch(`/containers/create`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -43,14 +43,14 @@ const DockerApi = () => {
                 }
                 console.log('Successfully created container: ' + containerID);
 
-                return fetch("/containers/" + containerID + "/start", {
+                return sooFetch("/containers/" + containerID + "/start", {
                     method: 'POST'
                 })
             })
             .then(responseOKOrFail("Could not submit a request to start the container (/containers/<ID>/start)"))
             .then(function (response) {
                 // response of the /start API call is empty
-                return fetch("/containers/" + containerID + "/attach?stderr=1&stdout=1&logs=1", {
+                return sooFetch("/containers/" + containerID + "/attach?stderr=1&stdout=1&logs=1", {
                     method: 'POST'
                 })
             })
@@ -64,7 +64,7 @@ const DockerApi = () => {
     // Invoked to determine whether the rebinded service
     // is the one targeted by this payload. Must return true or false.
     async function isService(headers, cookie, body) {
-        return fetch("/version",{
+        return sooFetch("/version",{
             mode: 'no-cors',
             credentials: 'omit',
         })

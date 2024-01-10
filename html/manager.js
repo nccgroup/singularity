@@ -33,6 +33,7 @@ const Configuration = () => {
     let attackPayload = null;
     let interval = null;
     let rebindingStrategy = null;
+    let attackMethod = null; //'iframe', or 'fetch
     let flushDns = null;
 
     let rebindingSuccessFn = null;
@@ -105,6 +106,7 @@ const Configuration = () => {
                     interval = config.interval;
                     wsProxyPort = config.wsProxyPort;
                     rebindingStrategy = config.rebindingStrategy;
+                    attackMethod = config.attackMethod;
                     flushDns = config.flushDns;
                 })
             return result;
@@ -158,12 +160,19 @@ const Configuration = () => {
             flushDns = boolean;
         },
         getRebindingSuccessFn() {
-            return rebindingSuccessFn
+            return rebindingSuccessFn;
+        },
+        getAttackMethod() {
+            return attackMethod;
+        },
+        setAttackMethod(attackMethodName) {
+            attackMethod = attackMethodName;
         },
         setManually(configObject) {
             attackHostIPAddress = configObject.attackHostIPAddress;
             attackHostDomain = configObject.attackHostDomain;
             rebindingStrategy = configObject.rebindingStrategy;
+            attackMethod = configObject.attackMethod;
             flushDns = configObject.flushDns;
             interval = configObject.interval;
             wsProxyPort = configObject.wsProxyPort;
@@ -354,6 +363,7 @@ const App = () => {
         document.getElementById('interval').value = configuration.getInterval();
         document.getElementById('wsproxyport').value = configuration.getWsProxyPort();
         document.getElementById(configuration.getRebindingStrategy()).selected = true;
+        document.getElementById('attackmethod').value = configuration.getAttackMethod();
         document.getElementById('flushdns').checked = configuration.getFlushDns();
     };
 
@@ -367,6 +377,11 @@ const App = () => {
             .replace("%5", configuration.getAttackHostDomain())
             .replace("%6", targetPort)
             .replace("%7", 'soopayload.html' + '?rnd=' + Math.random())
+    };
+
+    function reloadAttackFrame(frame) {
+        console.log(`reloadAttackFrame: ${frame.getURL()}`);
+        document.getElementById(frame.getId()).src = frame.getURL();
     };
 
     return {
@@ -443,6 +458,7 @@ const App = () => {
             };
         },
         addFrameToDOM(frame) {
+            console.log(`addFrameToDOM: ${frame.getURL()}`);
             let f = document.createElement('iframe');
             f.src = frame.getURL();
             f.setAttribute('id', frame.getId());
@@ -454,7 +470,7 @@ const App = () => {
         // thus loading the attack payload before rebinding
         // and accessing the target after rebinding.
         reloadAttackFrame(frame) {
-            document.getElementById(frame.getId()).src = frame.getURL();
+            reloadAttackFrame(frame);
         },
 
         // communication handler between manager and attack iframe.
@@ -491,11 +507,19 @@ const App = () => {
                     param: { hostname: window.location.hostname, flushDns: configuration.getFlushDns() }
                 }, "*");
                 configuration.setFlushDns(false); // so it run only once in autoattack.
+                if (configuration.getAttackMethod() === 'fetch') {
                 msg.source.postMessage({
-                    cmd: 'start',
+                    cmd: 'startFetch',
                     param: null
                 }, "*");
-            }
+                } else {
+                    msg.source.postMessage({
+                        cmd: 'startReloadChildFrame',
+                        param: null
+                    }, "*");
+                }
+            };
+
             if (msg.data.status === 'success') {
                 configuration.getRebindingSuccessFn()(msg);
                 msg.source.postMessage({
@@ -535,6 +559,9 @@ const App = () => {
 
             const UiAttackPayloadName = document.getElementById('payloads').value;
             configuration.setAttackPayload(UiAttackPayloadName);
+
+            const UIAttackMethod = document.getElementById('attackmethod').value;
+            configuration.setAttackMethod (UIAttackMethod);
 
             const UiAttackWsProxyPort = document.getElementById('wsproxyport').value;
             configuration.setWsProxyPort(UiAttackWsProxyPort);

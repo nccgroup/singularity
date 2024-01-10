@@ -59,6 +59,11 @@
             // Use "20" for all rebinding strategies except for "FromQueryMultiA", where "1" will work.
             interval: "20",
 
+            // Attack using the Fetch API ('fetch'), or iframes ('iframe')
+            // Fetch API works with most browsers, but is blocked by Chrome by most (but not all) target configurations. 
+            // Inline Frame should work with most browsers, unless the target application does not allow rendering in an iframe.
+            attackMethod: 'fetch',
+
             // Flush Chrome DNS browser cache to improve DNS Rebinding attack speed.
             flushDns: false,
 
