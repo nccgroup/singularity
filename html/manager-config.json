@@ -12,7 +12,10 @@
     "attackPayloads": [{
         "name": "Simple Fetch Get",
         "ports": []
-    },{
+    }, {
+        "name": "Ollama Llama2 Exfil",
+        "ports": [11434]
+    }, {
         "name": "Hook and Control",
         "ports": []
     }, {
