@@ -38,7 +38,7 @@ func initFromCmdLine() *singularity.AppConfig {
 	var responseReboundIPAddr = flag.String("ResponseReboundIPAddr", "127.0.0.1",
 		"Specify the victim host IP address that is rebound from the attacker host address")
 	var responseReboundIPAddrtimeOut = flag.Int("responseReboundIPAddrtimeOut", 300,
-		"Specify delay (s) for which we will keep responding with Rebound IP Address after last query. After delay, we will respond with  ResponseReboundIPAddr.")
+		"Specify delay (s) for which we will keep responding with Rebound IP Address after last query. After delay, we will respond with ResponseIPAddr.")
 	var dangerouslyAllowDynamicHTTPServers = flag.Bool("dangerouslyAllowDynamicHTTPServers", false, "DANGEROUS if the flag is set (to anything). Specify if any target can dynamically request Singularity to allocate an HTTP Server on a new port.")
 	var WsHttpProxyServerPort = flag.Int("WsHttpProxyServerPort", 3129,
 		"Specify the attacker HTTP Proxy Server and Websockets port that permits to browse hijacked client services.")
