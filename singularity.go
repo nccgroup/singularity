@@ -117,8 +117,6 @@ type DNSQuery struct {
 func NewDNSQuery(qname string) (*DNSQuery, error) {
 	name := new(DNSQuery)
 
-	qname = strings.ToLower(qname) // DNS-0x20 work-around
-
 	qname = strings.Replace(qname, "--", "_", -1)
 
 	split := strings.Split(qname, "-e.")
@@ -292,7 +290,9 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 				case dns.TypeA:
 					log.Printf("DNS: Received A query: %v from: %v\n", q.Name, w.RemoteAddr().String())
 
-					if !strings.HasPrefix(q.Name, "s-") {
+					qnameLower := strings.ToLower(q.Name)
+
+					if !strings.HasPrefix(qnameLower, "s-") {
 
 						// Handling query with potential QNAME minimization
 
@@ -320,7 +320,7 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 					clientState.ResponseReboundIPAddrtimeOut = appConfig.ResponseReboundIPAddrtimeOut
 
 					var err error
-					name, err = NewDNSQuery(q.Name)
+					name, err = NewDNSQuery(qnameLower)
 
 					if err != nil {
 						log.Printf("DNS: Parsing of query failed: %v, with error: %v\n", name, err)
