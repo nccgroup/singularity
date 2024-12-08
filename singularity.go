@@ -3,6 +3,7 @@ package singularity
 import (
 	"context"
 	crand "crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -15,10 +16,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/miekg/dns"
@@ -56,6 +57,20 @@ type AppConfig struct {
 	DNSServerBindAddr            string
 	WsHTTPProxyServerPort        int
 	EnableLinuxTProxySupport     bool
+	DontDropPrivileges           bool
+	DropPrivilegesUserName       bool
+	DropToUserName               string
+}
+
+// Parse IP address from a string or 32-bit integer
+func parseIP(s string) net.IP {
+	// parse ip and if decimal, convert to IP
+	if ipInt, err := strconv.ParseUint(s, 10, 32); err == nil {
+		ip := make(net.IP, 4)
+		binary.BigEndian.PutUint32(ip, uint32(ipInt))
+		return ip
+	}
+	return net.ParseIP(s)
 }
 
 // GenerateRandomString returns a secure random hexstring, 20 chars long
@@ -145,21 +160,23 @@ func NewDNSQuery(qname string) (*DNSQuery, error) {
 		return name, errors.New("cannot parse DNS query")
 	}
 
-	if net.ParseIP(elements[0]) == nil {
+	if parseIP(elements[0]) == nil {
 		return name, errors.New("cannot parse IP address of first host in DNS query")
-
 	}
-	name.ResponseIPAddr = elements[0]
+	name.ResponseIPAddr = parseIP(elements[0]).String()
 
 	if elements[1] != "localhost" {
-
 		elements[1] = strings.Replace(elements[1], "_", "-", -1)
-		if net.ParseIP(elements[1]) == nil && golang.IsDomainName(elements[1]) == false {
+		if parseIP(elements[1]) != nil {
+			name.ResponseReboundIPAddr = parseIP(elements[1]).String()
+		} else if golang.IsDomainName(elements[1]) != false {
+			name.ResponseReboundIPAddr = elements[1]
+		} else {
 			return name, errors.New("cannot parse IP address or CNAME of second host in DNS query")
 		}
+	} else {
+		name.ResponseReboundIPAddr = elements[1]
 	}
-
-	name.ResponseReboundIPAddr = elements[1]
 
 	name.Session = elements[2]
 
@@ -799,23 +816,19 @@ type HTTPServerError struct {
 	Port string
 }
 
-// Linux Transparent Proxy Support
-// https://www.kernel.org/doc/Documentation/networking/tproxy.txt
-// e.g. `sudo iptables -t mangle -I PREROUTING -d ext_ip_address
-// -p tcp --dport 8080 -j TPROXY --on-port=80 --on-ip=ext_ip_address
-// will redirect external port 8080 on port 80 of Singularity
-func useIPTransparent(network, address string, conn syscall.RawConn) error {
-	return conn.Control(func(descriptor uintptr) {
-		syscall.SetsockoptInt(int(descriptor), syscall.IPPROTO_IP, syscall.IP_TRANSPARENT, 1)
-	})
-}
-
 // StartHTTPServer starts an HTTP server
 // and adds it to  dynamic (if dynamic is true) or static HTTP Store
 func StartHTTPServer(s *http.Server, hss *HTTPServerStoreHandler, dynamic bool, tproxy bool) error {
 
 	var err error
 	var l net.Listener
+
+	if runtime.GOOS == "darwin" {
+		if tproxy == true {
+			log.Printf("HTTP: Transparent proxy support is not availible on macOS\n")
+		}
+		tproxy = false
+	}
 
 	if tproxy == true {
 		listenConfig := &net.ListenConfig{Control: useIPTransparent}
