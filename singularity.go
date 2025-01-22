@@ -56,6 +56,7 @@ type AppConfig struct {
 	DNSServerBindAddr            string
 	WsHTTPProxyServerPort        int
 	EnableLinuxTProxySupport     bool
+	IgnoreDNSRequestFrom         []net.IP
 }
 
 // GenerateRandomString returns a secure random hexstring, 20 chars long
@@ -114,65 +115,87 @@ type DNSQuery struct {
 // if target contains a CNAME instead of an IP address
 // and if CNAME includes any "-",
 // then each of these "-" must be escaped with another "-"
+// Updated format:
+// s-hexstring1.hexstring2-session-method-e.attackerdomain
+// where hexstring1 and hexstring2 are fully expanded v4 or v6 IP adddresses
+// (8 or 16 bytes long)
+
 func NewDNSQuery(qname string) (*DNSQuery, error) {
 	name := new(DNSQuery)
 
 	qname = strings.Replace(qname, "--", "_", -1)
 
-	split := strings.Split(qname, "-e.")
-
-	if len(split) == 1 {
-		return name, errors.New("cannot find end tag in DNS query")
-	}
-
-	head := split[0]
-
-	tail := strings.Split(head, "s-")
-
-	if len(tail) == 1 {
+	if !strings.HasPrefix(qname, "s-") {
 		return name, errors.New("cannot find start tag in DNS query")
 	}
 
-	elements := strings.Split(tail[1], "-")
+	qname = strings.TrimPrefix(qname, "s-")
 
-	domainSuffix := split[1]
+	split1 := strings.Split(qname, "-e.")
 
-	if (len(domainSuffix) < 3) && (strings.ContainsAny(domainSuffix, ".") == false) {
+	if len(split1) != 2 {
+		return name, errors.New("cannot find end tag in DNS query")
+	}
+
+	domainSuffix := split1[1]
+
+	if (len(domainSuffix) < 3) && !strings.ContainsAny(domainSuffix, ".") {
 		return name, errors.New("cannot parse domain in DNS query")
 	}
 
-	if len(elements) != 4 {
-		return name, errors.New("cannot parse DNS query")
+	split2 := strings.Split(split1[0], "-")
+
+	if len(split2) != 3 {
+		return name, errors.New("cannot parse start of DNS query")
 	}
 
-	if net.ParseIP(elements[0]) == nil {
-		return name, errors.New("cannot parse IP address of first host in DNS query")
+	eleme0, eleme1, found := strings.Cut(split2[0], ".")
 
+	if !found {
+		return name, errors.New("cannot find attacker and target hosts")
 	}
-	name.ResponseIPAddr = elements[0]
 
-	if elements[1] != "localhost" {
+	elem0, err := hex.DecodeString(eleme0)
+	if err != nil {
+		return name, fmt.Errorf("failed to decode IP address of the first host in DNS query")
+	}
 
-		elements[1] = strings.Replace(elements[1], "_", "-", -1)
-		if net.ParseIP(elements[1]) == nil && golang.IsDomainName(elements[1]) == false {
-			return name, errors.New("cannot parse IP address or CNAME of second host in DNS query")
+	elem0ip := net.IP(elem0)
+	var elem1Str string
+	elem1, err := hex.DecodeString(eleme1)
+	if err != nil {
+		// probably a name, not an IP address
+		elem1Str = eleme1
+
+		if elem1Str != "localhost" {
+			elem1Str = strings.Replace(elem1Str, "_", "-", -1)
+			if golang.IsDomainName(elem1Str) == false {
+				return name, errors.New("cannot parse CNAME of second host in DNS query")
+			}
 		}
+	} else {
+		elem1ip := net.IP(elem1)
+		elem1Str = elem1ip.String()
 	}
 
-	name.ResponseReboundIPAddr = elements[1]
+	name.ResponseIPAddr = elem0ip.String()
+	name.ResponseReboundIPAddr = elem1Str
 
-	name.Session = elements[2]
+	name.Session = split2[1]
 
 	if len(name.Session) == 0 {
 		return name, errors.New("cannot parse session in DNS query")
-
 	}
 
-	name.DNSRebindingStrategy = elements[3]
-
+	name.DNSRebindingStrategy = split2[2]
 	name.Domain = fmt.Sprintf(".%v", domainSuffix)
 
 	return name, nil
+}
+
+func NewDNSQueryFromOrigin(origin string) (*DNSQuery, error) {
+	s := strings.TrimPrefix(origin, "http://")
+	return NewDNSQuery(strings.Split(s, ":")[0])
 }
 
 // dnsRebindFirst is a convenience function
@@ -269,6 +292,28 @@ func DNSRebindFromQueryMultiA(session string, dcss *DNSClientStateStore, q dns.Q
 	return answers
 }
 
+func addrInIPAddressList(addr net.Addr, ips []net.IP) bool {
+	var addrIP net.IP
+
+	switch a := addr.(type) {
+	case *net.TCPAddr:
+		addrIP = a.IP
+	case *net.UDPAddr:
+		addrIP = a.IP
+	case *net.IPAddr:
+		addrIP = a.IP
+	default:
+		return false
+	}
+
+	for _, ip := range ips {
+		if ip.Equal(addrIP) {
+			return true
+		}
+	}
+	return false
+}
+
 // MakeRebindDNSHandler generates a DNS request handler
 // based on app settings.
 // This is the core DNS queries handling loop
@@ -287,14 +332,18 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 		case dns.OpcodeQuery:
 			for _, q := range m.Question {
 				switch q.Qtype {
-				case dns.TypeA:
-					log.Printf("DNS: Received A query: %v from: %v\n", q.Name, w.RemoteAddr().String())
+				case dns.TypeA, dns.TypeAAAA:
+					log.Printf("DNS: Received %v query: %v from: %v\n", q.Qtype, q.Name, w.RemoteAddr().String())
+
+					if addrInIPAddressList(w.RemoteAddr(), appConfig.IgnoreDNSRequestFrom) {
+						log.Printf("DNS: Ignoring (ignoreDNSRequestFrom) %v query: %v from: %v\n", q.Qtype, q.Name, w.RemoteAddr().String())
+						return
+					}
 
 					qnameLower := strings.ToLower(q.Name)
 
+					// Handling query with potential QNAME minimization
 					if !strings.HasPrefix(qnameLower, "s-") {
-
-						// Handling query with potential QNAME minimization
 
 						if net.ParseIP(appConfig.ResponseIPAddr) == nil {
 							// DNS: Singularity external IP address apparently not configured or misconfigured
@@ -302,12 +351,22 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 							return
 						}
 
-						response := fmt.Sprintf("%s %s IN A %s", q.Name, "0", appConfig.ResponseIPAddr)
+						var response string
+						address := net.ParseIP(appConfig.ResponseIPAddr)
+						if address != nil {
+							if address.To4() != nil {
+								response = fmt.Sprintf("%s %s IN A %s", q.Name, "0", appConfig.ResponseIPAddr)
+							} else {
+								response = fmt.Sprintf("%s %s IN AAAA %s", q.Name, "0", appConfig.ResponseIPAddr)
+							}
+						} else {
+							log.Printf("DNS: failed to parse our application configuration response IP address: %v\n", appConfig.ResponseIPAddr)
+						}
 
 						rr, err := dns.NewRR(response)
 						if err == nil {
 							m.Answer = append(m.Answer, rr)
-							log.Printf("DNS: response: %v %v\n", response, q.Name)
+							log.Printf("DNS: response to %v (DNS Query Name Minimisation): %v %v\n", w.RemoteAddr().String(), response, q.Name)
 							w.WriteMsg(m)
 							return
 						}
@@ -327,7 +386,7 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 						return
 					}
 
-					log.Printf("DNS: Parsed query: %v\n", name)
+					log.Printf("DNS: Parsed query from %v: %v\n", w.RemoteAddr().String(), name)
 
 					clientState.ResponseIPAddr = name.ResponseIPAddr
 					clientState.ResponseReboundIPAddr = name.ResponseReboundIPAddr
@@ -342,10 +401,6 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 					if keyExists != true {
 						// New session
 						dcss.Sessions[name.Session] = clientState
-					} else {
-						// Existing session
-						dcss.Sessions[name.Session].ResponseIPAddr = clientState.ResponseIPAddr
-						dcss.Sessions[name.Session].ResponseReboundIPAddr = clientState.ResponseReboundIPAddr
 					}
 					dcss.Unlock()
 
@@ -353,21 +408,69 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 
 					response := []string{}
 
-					respond := func(question string, time string, answer string) string {
-						// we respond with one A record
-						response := fmt.Sprintf("%s %s IN A %s", question, time, answer)
-						//otherwise we respond with a CNAME record if we do not have an IP address
-						if net.ParseIP(answer) == nil {
+					respond := func(question, time, answer string, additionalRecord bool) (string, error) {
+						// we respond with one A or AAAA record
+						var response string
+						address := net.ParseIP(answer)
+
+						if address != nil {
+
+							var recordType string
+							if address.To4() == nil {
+								recordType = "AAAA" // IPv6
+							} else {
+								recordType = "A" // IPv4
+							}
+
+							isMatch := (recordType == "AAAA" && q.Qtype == dns.TypeAAAA) ||
+								(recordType == "A" && q.Qtype == dns.TypeA)
+
+							if isMatch {
+								response = fmt.Sprintf("%s %s IN %s %s", question, time, recordType, answer)
+							} else {
+								// Possibly fallback to Qclass if additionalRecord is true
+								if additionalRecord {
+									// Determine fallback record type based on Qclass
+									var fallbackType string
+									if q.Qclass == dns.TypeAAAA {
+										fallbackType = "AAAA"
+									} else {
+										fallbackType = "A"
+									}
+									response = fmt.Sprintf("%s %s IN %s %s", question, time, fallbackType, answer)
+								} else {
+									return "", fmt.Errorf("DNS: won't respond with AAAA for an A query (or vice versa) for %q", name)
+								}
+							}
+						} else {
+							// Otherwise, we respond with a CNAME record
 							response = fmt.Sprintf("%s 10 IN CNAME %s.", question, answer)
 						}
-						return response
+						return response, nil
 					}
 
 					if len(answers) == 1 { //we return only one answer
-						response = append(response, respond(q.Name, "0", answers[0]))
+						res, err := respond(q.Name, "0", answers[0], false)
+						if err != nil {
+							w.WriteMsg(m)
+							return
+						}
+						response = append(response, res)
 					} else { // We respond with multiple answers
-						response = append(response, respond(q.Name, "10", answers[0]))
-						response = append(response, respond(q.Name, "0", answers[1]))
+						res, err := respond(q.Name, "10", answers[0], false)
+						if err != nil {
+							w.WriteMsg(m)
+							return
+						}
+						response = append(response, res)
+
+						res, err = respond(q.Name, "0", answers[1], true)
+
+						if err != nil {
+							w.WriteMsg(m)
+							return
+						}
+						response = append(response, res)
 					}
 
 					dcss.Lock()
@@ -380,7 +483,7 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 						rr, err := dns.NewRR(resp)
 						if err == nil {
 							m.Answer = append(m.Answer, rr)
-							log.Printf("DNS: response: %v\n", resp)
+							log.Printf("DNS: response to %v: %v\n", w.RemoteAddr().String(), resp)
 						}
 					}
 				}
@@ -668,15 +771,29 @@ func (ipt *IPTablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	defer conn.Close()
 
-	log.Printf("HTTP: implementing firewall rule for %v\n", conn.RemoteAddr())
-	dst := strings.Split(conn.LocalAddr().String(), ":")
-	src := strings.Split(conn.RemoteAddr().String(), ":")
-	srcAddr := src[0]
-	srcPort := src[1]
-	dstAddr := dst[0]
-	dstPort := dst[1]
+	log.Printf("HTTP: implementing firewall rule for %v\n", conn.RemoteAddr().String())
 
-	ipTablesRule := NewIPTableRule(srcAddr, srcPort, dstAddr, dstPort)
+	dstAddr, dstPort, err := net.SplitHostPort(conn.LocalAddr().String())
+	if err != nil {
+		log.Printf("HTTP: could not prepare firewall rule for %v\n", conn.LocalAddr().String())
+		return
+	}
+
+	srcAddr, srcPort, err := net.SplitHostPort(conn.RemoteAddr().String())
+	if err != nil {
+		log.Printf("HTTP: could not prepare firewall rule for %v\n", conn.RemoteAddr().String())
+		return
+	}
+
+	ip := net.ParseIP(srcAddr)
+	if ip == nil {
+		log.Printf("HTTP: could not prepare firewall rule for %v\n", srcAddr)
+		return
+	}
+
+	// If ip.To4() is not nil, it's IPv4; otherwise, it's IPv6
+
+	ipTablesRule := NewIPTableRule(srcAddr, srcPort, dstAddr, dstPort, ip.To4() == nil)
 	go func(rule *IPTablesRule) {
 		time.Sleep(time.Second * time.Duration(5))
 		ipTablesRule.RemoveRule()
@@ -686,7 +803,7 @@ func (ipt *IPTablesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	//Instead of writing the beginning of a valid HTTP response
 	// e.g. bufrw.WriteString("HTTP")
-	// that works with most browsers except Edge,
+	// that works with most browsers except (old) Edge,
 	// we write the token value for Edge to determine whether it is connected to
 	// target or attacker. TODO make this value a startup parameter.
 	bufrw.WriteString("thisismytesttoken")
