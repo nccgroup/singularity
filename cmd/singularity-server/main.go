@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
@@ -28,10 +29,26 @@ func (a *arrayPortFlags) Set(value string) error {
 	return nil
 }
 
+type ArrIpAddressFlags []net.IP
+
+func (a *ArrIpAddressFlags) String() string {
+	return fmt.Sprintf("%T", a)
+}
+
+func (a *ArrIpAddressFlags) Set(value string) error {
+	addr := net.ParseIP(value)
+	if addr == nil {
+		log.Fatal("Could not parse IP address")
+	}
+	*a = append(*a, addr)
+	return nil
+}
+
 // Parse command line arguments and capture these into a runtime structure
 func initFromCmdLine() *singularity.AppConfig {
 	var appConfig = singularity.AppConfig{}
 	var myArrayPortFlags arrayPortFlags
+	var myArrIpAddressesFlags ArrIpAddressFlags
 
 	var responseIPAddr = flag.String("ResponseIPAddr", "unconfigured",
 		"Specify the attacker host external IP address that will be used for default DNS responses. Useful for handling QNAME Minimization.")
@@ -44,6 +61,7 @@ func initFromCmdLine() *singularity.AppConfig {
 		"Specify the attacker HTTP Proxy Server and Websockets port that permits to browse hijacked client services.")
 	var enableLinuxTProxySupport = flag.Bool("enableLinuxTProxySupport", false, "Specify whether to enable Linux TProxy support or not. Useful to listen on many ports with an appropriate iptables configuration.")
 	flag.Var(&myArrayPortFlags, "HTTPServerPort", "Specify the attacker HTTP Server port that will serve HTML/JavaScript files. Repeat this flag to listen on more than one HTTP port.")
+	flag.Var(&myArrIpAddressesFlags, "ignoreDNSRequestFrom", "Specify a source IP address to ignore DNS requests from. Repeat this flag to ignore more than one IP address. Useful for reliable DNS rebinding sessions, where third-parties may repeat DNS requests from targets.")
 	var dnsServerBindAddr = flag.String("DNSServerBindAddr", "0.0.0.0", "Specify the IP address the DNS server will bind to, defaults to 0.0.0.0")
 
 	flag.Parse()
@@ -65,6 +83,7 @@ func initFromCmdLine() *singularity.AppConfig {
 	appConfig.DNSServerBindAddr = *dnsServerBindAddr
 	appConfig.WsHTTPProxyServerPort = *WsHttpProxyServerPort
 	appConfig.EnableLinuxTProxySupport = *enableLinuxTProxySupport
+	appConfig.IgnoreDNSRequestFrom = myArrIpAddressesFlags
 
 	return &appConfig
 }

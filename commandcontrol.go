@@ -396,7 +396,7 @@ func (c *WSClient) keepAlive(wscss *WebsocketClientStateStore, sessionID string)
 	}
 }
 
-//RoundTrip is a custom RoundTrip implementation for reverse proxy to websocket
+// RoundTrip is a custom RoundTrip implementation for reverse proxy to websocket
 func (t *ProxytoWebsocketTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	headers := make(map[string]string)
 
@@ -608,7 +608,7 @@ func (ws *WebsocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer c.Close()
 
-	name, err := NewDNSQuery(r.Header.Get("origin"))
+	name, err := NewDNSQueryFromOrigin(r.Header.Get("origin"))
 
 	if err != nil {
 		log.Printf("websockets: could not parse origin hostname: %v\n", err)

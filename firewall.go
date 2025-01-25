@@ -7,20 +7,21 @@ import (
 	"strconv"
 )
 
-//IPTablesRule is a struct representing a linux iptable firewall rule
+// IPTablesRule is a struct representing a linux iptable firewall rule
 type IPTablesRule struct {
 	srcAddr      string
 	srcPort      string
 	dstAddr      string
 	dstPort      string
 	srcPortRange string
+	v6           bool
 }
 
-//NewIPTableRule populate an iptables rule
+// NewIPTableRule populate an iptables rule
 func NewIPTableRule(srcAddr string, srcPort string,
-	dstAddr string, dstPort string) *IPTablesRule {
+	dstAddr string, dstPort string, v6 bool) *IPTablesRule {
 	p := IPTablesRule{srcAddr: srcAddr, srcPort: srcPort,
-		dstAddr: dstAddr, dstPort: dstPort}
+		dstAddr: dstAddr, dstPort: dstPort, v6: v6}
 	p.generateSourcePortRange(10)
 	return &p
 }
@@ -48,7 +49,11 @@ func (ipt *IPTablesRule) generateSourcePortRange(max int) {
 }
 
 func (ipt *IPTablesRule) makeAndRunRule(command string) {
-	rule := exec.Command("/sbin/iptables",
+	iptables := "/sbin/iptables"
+	if ipt.v6 {
+		iptables = "/usr/sbin/ip6tables"
+	}
+	rule := exec.Command(iptables,
 		command, "INPUT", "-p", "tcp", "-j", "REJECT", "--reject-with", "tcp-reset",
 		"--source", ipt.srcAddr, //"--sport" srcPortRange,
 		"--destination", ipt.dstAddr, "--destination-port", ipt.dstPort)
@@ -56,12 +61,12 @@ func (ipt *IPTablesRule) makeAndRunRule(command string) {
 	log.Printf("Firewall: `iptables` finished with return code: %v", err)
 }
 
-//AddRule adds an iptables rule in Linux iptable
+// AddRule adds an iptables rule in Linux iptable
 func (ipt *IPTablesRule) AddRule() {
 	ipt.makeAndRunRule("-A")
 }
 
-//RemoveRule removes an iptables rule in Linux iptable
+// RemoveRule removes an iptables rule in Linux iptable
 func (ipt *IPTablesRule) RemoveRule() {
 	ipt.makeAndRunRule("-D")
 }

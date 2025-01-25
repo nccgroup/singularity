@@ -340,7 +340,7 @@ function putData(url, data) {
 const App = () => {
     let configuration = null;
     let fm = null;
-    let hosturl = "http://s-%1-%2-%3-%4-e.%5:%6/%7";
+    let hosturl = "http://s-%1.%2-%3-%4-e.%5:%6/%7";
 
     // Push settings from configuration object (obtained from manager-config.json) to UI.
     function populateManagerConfig() {
@@ -367,10 +367,140 @@ const App = () => {
         document.getElementById('flushdns').checked = configuration.getFlushDns();
     };
 
+
+// Helper functions to allow users inputting common IP addresses instead of hexstrings, and CNAMEs
+
+function ipToHexOrOriginal(input) {
+    let ipv4Bytes = parseIPv4(input);
+    if (ipv4Bytes !== null) {
+      return bytesToHex(ipv4Bytes);
+    }
+    
+    let ipv6Bytes = parseIPv6(input);
+    if (ipv6Bytes !== null) {
+      return bytesToHex(ipv6Bytes);
+    }
+    
+    // Not an IPv4 or IPv6, return original string, typically a CNAME record
+    return input;
+  }
+
+  function parseIPv4(str) {
+    const parts = str.split('.');
+    if (parts.length !== 4) {
+      return null;
+    }
+    
+    let bytes = new Uint8Array(4);
+    for (let i = 0; i < 4; i++) {
+      const num = Number(parts[i]);
+      // Each part must be an integer within [0..255]
+      if (
+        !Number.isInteger(num) ||
+        num < 0 ||
+        num > 255 
+      ) {
+        return null;
+      }
+      bytes[i] = num;
+    }
+    return bytes;
+  }
+
+  function parseIPv6(str) {
+    // Split on '::' first - only one such sequence is allowed
+    let parts = str.split('::');
+    
+    if (parts.length > 2) {
+      return null; // invalid: more than one '::'
+    }
+    
+    let head = [];
+    let tail = [];
+    
+    // Split the head by ':'
+    if (parts[0] !== '') {
+      head = parts[0].split(':');
+    } else {
+      // If parts[0] is empty, it means the address starts with '::'
+      head = [];
+    }
+    
+    // Split the tail by ':'
+    if (parts.length === 2 && parts[1] !== '') {
+      tail = parts[1].split(':');
+    } else if (parts.length === 2 && parts[1] === '') {
+      // If parts[1] is empty, it means the address ends with '::'
+      tail = [];
+    }
+    
+    // Now we know the total number of blocks we have
+    // The full IPv6 must have 8 groups (16 bytes total)
+    let missingGroups = 8 - (head.length + tail.length);
+    if (missingGroups < 0) {
+      // Means we have more than 8 groups in total
+      return null;
+    }
+    
+    // Build the full array of groups in hex
+    let groups = [];
+    
+    // Validate and push the head
+    for (let h of head) {
+      if (!isValidHextet(h)) {
+        return null;
+      }
+      groups.push(h);
+    }
+    
+    // Insert the zero-groups for '::'
+    for (let i = 0; i < missingGroups; i++) {
+      groups.push('0');
+    }
+    
+    // Validate and push the tail
+    for (let t of tail) {
+      if (!isValidHextet(t)) {
+        return null;
+      }
+      groups.push(t);
+    }
+    
+    if (groups.length !== 8) {
+      return null; // sanity check
+    }
+    
+    // Convert each group from hex into two bytes
+    let bytes = new Uint8Array(16);
+    for (let i = 0; i < 8; i++) {
+      let val = parseInt(groups[i], 16);
+      // High byte
+      bytes[i * 2] = (val >> 8) & 0xff;
+      // Low byte
+      bytes[i * 2 + 1] = val & 0xff;
+    }
+    
+    return bytes;
+  }
+
+  function isValidHextet(str) {
+    if (str.length === 0 || str.length > 4) {
+      return false;
+    }
+    // Check valid hex
+    return /^[0-9A-Fa-f]+$/.test(str);
+  }
+
+  function bytesToHex(bytes) {
+    return Array.from(bytes)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
     function generateAttackUrl(targetHostIPAddress, targetPort, forceDnsRebindingStrategyName) {
         return hosturl
-            .replace("%1", configuration.getAttackHostIPAddress())
-            .replace("%2", targetHostIPAddress) // replace(/-/g, '--'))
+            .replace("%1", ipToHexOrOriginal(configuration.getAttackHostIPAddress()))
+            .replace("%2", ipToHexOrOriginal(targetHostIPAddress)) // replace(/-/g, '--'))
             .replace("%3", Math.floor(Math.random() * 2 ** 32))
             .replace("%4", forceDnsRebindingStrategyName === null ?
                 configuration.getRebindingStrategy() : forceDnsRebindingStrategyName)
@@ -568,8 +698,8 @@ const App = () => {
 
 
             let fid = fm.addFrame(hosturl
-                .replace("%1", document.getElementById('attackhostipaddress').value)
-                .replace("%2", document.getElementById('targethostipaddress').value.replace(/-/g, '--'))
+                .replace("%1", ipToHexOrOriginal(document.getElementById('attackhostipaddress').value))
+                .replace("%2", ipToHexOrOriginal(document.getElementById('targethostipaddress').value.replace(/-/g, '--')))
                 .replace("%3", Math.floor(Math.random() * 2 ** 32))
                 .replace("%4", document.getElementById('rebindingStrategy').value)
                 .replace("%5", document.getElementById('attackhostdomain').value)
