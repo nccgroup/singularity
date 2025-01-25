@@ -428,18 +428,10 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 							if isMatch {
 								response = fmt.Sprintf("%s %s IN %s %s", question, time, recordType, answer)
 							} else {
-								// Possibly fallback to Qclass if additionalRecord is true
 								if additionalRecord {
-									// Determine fallback record type based on Qclass
-									var fallbackType string
-									if q.Qclass == dns.TypeAAAA {
-										fallbackType = "AAAA"
-									} else {
-										fallbackType = "A"
-									}
-									response = fmt.Sprintf("%s %s IN %s %s", question, time, fallbackType, answer)
+									response = fmt.Sprintf("%s %s IN %s %s", question, time, recordType, answer)
 								} else {
-									return "", fmt.Errorf("DNS: won't respond with AAAA for an A query (or vice versa) for %q", name)
+									return "", fmt.Errorf("mismatch between query and response types) for %q", name)
 								}
 							}
 						} else {
@@ -453,13 +445,15 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 						res, err := respond(q.Name, "0", answers[0], false)
 						if err != nil {
 							w.WriteMsg(m)
+							log.Printf("DNS: response to %v: %v, sending empty response\n", w.RemoteAddr().String(), err)
 							return
 						}
 						response = append(response, res)
 					} else { // We respond with multiple answers
-						res, err := respond(q.Name, "10", answers[0], false)
+						res, err := respond(q.Name, "10", answers[0], true)
 						if err != nil {
 							w.WriteMsg(m)
+							log.Printf("DNS: response to %v: %v, sending empty response\n", w.RemoteAddr().String(), err)
 							return
 						}
 						response = append(response, res)
@@ -468,6 +462,7 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 
 						if err != nil {
 							w.WriteMsg(m)
+							log.Printf("DNS: response to %v: %v, sending empty response\n", w.RemoteAddr().String(), err)
 							return
 						}
 						response = append(response, res)
