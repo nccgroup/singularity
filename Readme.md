@@ -7,7 +7,7 @@ Recent updates:
 - (2020-03-30) New blog post investigating the [impact of DoH on DNS rebinding attacks](https://www.nccgroup.com/us/research-blog/impact-of-dns-over-https-doh-on-dns-rebinding-attacks/). TL;DR: DoH (DNS over HTTPS) has no effect on rebinding attacks and protections advertised by providers can be bypassed.
 
 - Check out our [DEF CON 27 video](https://youtu.be/y9-0lICNjOQ) and BSidesLV presentation at [State of DNS Rebinding: Attack & Prevention Techniques and
-the Singularity of Origin](https://bit.ly/Singularity_Defcon27).
+the Singularity of Origin](https://media.defcon.org/DEF%20CON%2027/DEF%20CON%2027%20presentations/DEFCON-27-Gerald-Doussot-Roger-Meyer-State-of-DNS-Rebinding-Attack-and-Prevention-Techniques-and-the-Singularity-of-Origin.pdf).
 
 `Singularity of Origin` is a tool to perform [DNS rebinding](https://en.wikipedia.org/wiki/DNS_rebinding) attacks.
 It includes the necessary components to rebind the IP address of the attack server DNS name to the target machine's IP address and to serve attack payloads to exploit vulnerable software on the target machine. 
