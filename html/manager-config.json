@@ -46,6 +46,9 @@
         "name": "Docker API",
         "ports": [2376]
     }, {
+        "name": "ComfyUI",
+        "ports": [8188]
+    }, {
         "name": "Jenkins Script Console",
         "ports": [8080]
     }, {
