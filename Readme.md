@@ -109,7 +109,7 @@ Singularity supports the following attack payloads:
 * **Docker API** (`docker-api.js`): This payload exploits the
   [Docker API](https://docs.docker.com/engine/api/latest/)
   and displays the `/etc/shadow` file of the Docker host.
-* **Ollama Llama2 Exfil** (`ollama-exfil.js`): Exfiltrate files from hosts running Ollama, an open-source system for running and managing large language models (LLMs). See blog [post](https://research.nccgroup.com/2024/04/08/technical-advisory-ollama-dns-rebinding-attack-cve-2024-28224/).
+* **Ollama Llama2 Exfil** (`ollama-exfil.js`): Exfiltrate files from hosts running Ollama, an open-source system for running and managing large language models (LLMs). See blog [post](https://www.nccgroup.com/us/research-blog/technical-advisory-ollama-dns-rebinding-attack-cve-2024-28224/).
 
 
 
