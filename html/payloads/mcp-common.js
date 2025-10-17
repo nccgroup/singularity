@@ -2,14 +2,16 @@
  * Common MCP (Model Context Protocol) client infrastructure
  * Provides base classes for implementing MCP clients over different transports
  * Reference: https://modelcontextprotocol.io/specification/2024-11-05
+ * Reference: https://modelcontextprotocol.io/specification/2025-03-26
  */
 
 /**
  * Base MCP client class with common JSON-RPC and protocol logic
  */
 class McpClient {
-	constructor(endpoint) {
+	constructor(endpoint, protocolVersion) {
 		this.server_endpoint = endpoint;
+		this.protocolVersion = protocolVersion;
 		this.rpcId = 1;
 		this.sessionId = null;
 		this.isConnected = false;
@@ -51,22 +53,24 @@ class McpClient {
 	parseMcpResponse(text) {
 		let resp;
 		
-		// Check for SSE format: event: message\ndata: {...}
-		if (text.includes('event: message')) {
+		// Check for SSE format: data: {...} (with or without event: prefix)
+		if (text.includes('data: ')) {
 			const dataMatch = text.match(/data: (.+)$/m);
 			if (dataMatch) {
 				try {
 					resp = JSON.parse(dataMatch[1]);
 				} catch (_e) {
-					// Failed to parse SSE data
+					console.log('Failed to parse SSE data:', dataMatch[1]);
 				}
 			}
-		} else {
-			// Plain JSON response
+		}
+		
+		// If not SSE or SSE parsing failed, try plain JSON
+		if (!resp) {
 			try {
 				resp = JSON.parse(text);
 			} catch (_e) {
-				// Failed to parse JSON
+				console.log('Failed to parse as JSON:', text.substring(0, 100));
 			}
 		}
 		
@@ -80,7 +84,7 @@ class McpClient {
 		console.log('Initializing MCP session...');
 		
 		const initMessage = this.jsonrpc("initialize", {
-			protocolVersion: "2024-11-05",
+			protocolVersion: this.protocolVersion,
 			capabilities: {},
 			clientInfo
 		});
@@ -212,7 +216,7 @@ class McpClient {
  */
 class McpSseClient extends McpClient {
 	constructor(sseEndpoint = "/sse") {
-		super(sseEndpoint);
+		super(sseEndpoint, "2024-11-05");
 		this.sessionEndpoint = null;
 		this.eventSource = null;
 		this.messageHandlers = new Map();
@@ -380,7 +384,7 @@ class McpSseClient extends McpClient {
  */
 class McpStreamableHttpClient extends McpClient {
 	constructor(endpoint = "/mcp") {
-		super(endpoint);
+		super(endpoint, "2025-03-26");
 	}
 
 	/**
@@ -430,11 +434,46 @@ class McpStreamableHttpClient extends McpClient {
 	}
 
 	/**
+	 * Read streaming response fully (for text/event-stream)
+	 */
+	async readStreamResponse(response) {
+		const reader = response.body.getReader();
+		const decoder = new TextDecoder();
+		let fullText = '';
+		
+		try {
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				fullText += decoder.decode(value, { stream: true });
+				
+				// Check if we have a complete JSON-RPC message
+				// SSE format ends with double newline
+				if (fullText.includes('\n\n') || fullText.includes('data: ')) {
+					// Try to parse what we have
+					const parsed = this.parseMcpResponse(fullText);
+					if (parsed && parsed.jsonrpc) {
+						// Got a complete message
+						break;
+					}
+				}
+			}
+		} finally {
+			reader.releaseLock();
+		}
+		
+		return fullText;
+	}
+
+	/**
 	 * Send message and wait for response (HTTP request/response)
 	 */
 	async sendAndWaitForResponse(message, _timeoutMs = 5000) {
 		const response = await this.sendMessage(message);
-		const responseText = await response.text();
+		const contentType = response.headers.get('content-type');
+		
+		console.log('Response content-type:', contentType);
+		console.log('Response status:', response.status);
 		
 		// Extract session ID from headers on first request
 		if (!this.sessionId) {
@@ -444,6 +483,18 @@ class McpStreamableHttpClient extends McpClient {
 				console.log('Extracted MCP session ID from headers:', this.sessionId);
 			}
 		}
+		
+		let responseText;
+		
+		// Handle streaming responses (text/event-stream)
+		if (contentType && contentType.includes('text/event-stream')) {
+			console.log('Detected SSE streaming response - reading stream...');
+			responseText = await this.readStreamResponse(response);
+		} else {
+			responseText = await response.text();
+		}
+		
+		console.log('Response text (first 200 chars):', responseText.substring(0, 200));
 		
 		return this.parseMcpResponse(responseText);
 	}
@@ -461,16 +512,24 @@ class McpStreamableHttpClient extends McpClient {
 	 */
 	async isServiceDetected() {
 		try {
-			const pingMessage = this.jsonrpc("ping", {});
-			const response = await this.sendMessage(pingMessage);
-			const responseText = await response.text();
-			const json = this.parseMcpResponse(responseText);
-
-			// Accept either result or error as signal that JSON-RPC endpoint exists
-			return typeof json === 'object' && 
-				(json.result !== undefined || json.error !== undefined) && 
-				json.jsonrpc === '2.0';
-		} catch (_e) {
+			console.log('Detecting MCP HTTP service at:', this.server_endpoint);
+			
+			// Temporarily increase timeout for detection of slow servers
+			const originalTimeout = 15000;  // 15 seconds for slow servers
+			const initMessage = this.jsonrpc("initialize", {
+				protocolVersion: this.protocolVersion,
+				capabilities: {},
+				clientInfo: { name: "singularity-probe", version: "1.0.0" }
+			});
+			
+			const initResponse = await this.sendAndWaitForResponse(initMessage, originalTimeout);
+			
+			console.log('HTTP detection - initialize response:', initResponse);
+			
+			// If initialize succeeded, it's an MCP server
+			return !!(initResponse && !initResponse.error);
+		} catch (e) {
+			console.log('HTTP detection failed:', e.message);
 			return false;
 		}
 	}

@@ -699,12 +699,48 @@
                         html += '<div class="mt-2"><strong>Arguments:</strong></div>';
                         for (const [argName, argSchema] of Object.entries(tool.inputSchema.properties)) {
                             const required = tool.inputSchema.required?.includes(argName) ? ' *' : '';
-                            html += `<div class="tool-arg-input">
-                                <label>${argName}${required}:</label>
-                                <input type="text" class="form-control form-control-sm" 
-                                    name="${argName}" placeholder="${argSchema.description || ''}" />
-                                <small class="text-muted">${argSchema.type || 'any'}</small>
-                            </div>`;
+                            
+                            // Handle array types differently
+                            if (argSchema.type === 'array') {
+                                const itemType = argSchema.items?.type || 'any';
+                                let exampleValue;
+                                if (itemType === 'string') {
+                                    exampleValue = '["value1", "value2", "value3"]';
+                                } else if (itemType === 'number') {
+                                    exampleValue = '[1, 2, 3]';
+                                } else if (itemType === 'integer') {
+                                    exampleValue = '[1, 2, 3]';
+                                } else {
+                                    exampleValue = '[{"key": "value"}, {"key2": "value2"}]';
+                                }
+                                const placeholder = `JSON array format: ${exampleValue}`;
+                                html += `<div class="tool-arg-input">
+                                    <label>${argName}${required}:</label>
+                                    <textarea class="form-control form-control-sm" 
+                                        name="${argName}" 
+                                        placeholder="${placeholder}" 
+                                        rows="2"></textarea>
+                                    <small class="text-muted">array of ${itemType} - use JSON format like: ${exampleValue}</small>
+                                </div>`;
+                            } else if (argSchema.type === 'object') {
+                                const placeholder = 'JSON object format: {"key": "value", "key2": "value2"}';
+                                html += `<div class="tool-arg-input">
+                                    <label>${argName}${required}:</label>
+                                    <textarea class="form-control form-control-sm" 
+                                        name="${argName}" 
+                                        placeholder="${placeholder}" 
+                                        rows="3"></textarea>
+                                    <small class="text-muted">object (JSON) - use JSON format like: {"key": "value"}</small>
+                                </div>`;
+                            } else {
+                                // String, number, boolean, etc.
+                                html += `<div class="tool-arg-input">
+                                    <label>${argName}${required}:</label>
+                                    <input type="text" class="form-control form-control-sm" 
+                                        name="${argName}" placeholder="${argSchema.description || ''}" />
+                                    <small class="text-muted">${argSchema.type || 'any'}</small>
+                                </div>`;
+                            }
                         }
                     }
                     
