@@ -592,6 +592,7 @@ function ipToHexOrOriginal(input) {
             let f = document.createElement('iframe');
             f.src = frame.getURL();
             f.setAttribute('id', frame.getId());
+            f.setAttribute('allow','local-network-access *');
             //f.setAttribute('style', "display: none");
             document.getElementById('attackframes').appendChild(f);
         },

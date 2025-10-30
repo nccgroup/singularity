@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/nccgroup/singularity"
@@ -44,11 +45,36 @@ func (a *ArrIpAddressFlags) Set(value string) error {
 	return nil
 }
 
+type portTokenFlags map[int]string
+
+func (p *portTokenFlags) String() string { return fmt.Sprintf("%T", *p) }
+func (p *portTokenFlags) Set(value string) error {
+	// Accept "8080=TOKEN" or "8080:TOKEN"
+	sep := "="
+	if i := strings.Index(value, ":"); i != -1 && strings.Index(value, "=") == -1 {
+		sep = ":"
+	}
+	parts := strings.SplitN(value, sep, 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("expected PORT=TOKEN, got %q", value)
+	}
+	port, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return fmt.Errorf("invalid port in %q: %w", value, err)
+	}
+	if *p == nil {
+		*p = make(map[int]string)
+	}
+	(*p)[port] = parts[1]
+	return nil
+}
+
 // Parse command line arguments and capture these into a runtime structure
 func initFromCmdLine() *singularity.AppConfig {
 	var appConfig = singularity.AppConfig{}
 	var myArrayPortFlags arrayPortFlags
 	var myArrIpAddressesFlags ArrIpAddressFlags
+	var originTrialTokens portTokenFlags
 
 	var responseIPAddr = flag.String("ResponseIPAddr", "unconfigured",
 		"Specify the attacker host external IP address that will be used for default DNS responses. Useful for handling QNAME Minimization.")
@@ -63,6 +89,7 @@ func initFromCmdLine() *singularity.AppConfig {
 	flag.Var(&myArrayPortFlags, "HTTPServerPort", "Specify the attacker HTTP Server port that will serve HTML/JavaScript files. Repeat this flag to listen on more than one HTTP port.")
 	flag.Var(&myArrIpAddressesFlags, "ignoreDNSRequestFrom", "Specify a source IP address to ignore DNS requests from. Repeat this flag to ignore more than one IP address. Useful for reliable DNS rebinding sessions, where third-parties may repeat DNS requests from targets.")
 	var dnsServerBindAddr = flag.String("DNSServerBindAddr", "0.0.0.0", "Specify the IP address the DNS server will bind to, defaults to 0.0.0.0")
+	flag.Var(&originTrialTokens, "OriginTrialToken", "Specify an Origin-Trial token for a given HTTP port as PORT=TOKEN (repeatable). Example: -OriginTrialToken 8080=TOKEN1 -OriginTrialToken 8000=TOKEN2")
 
 	flag.Parse()
 	flagset := make(map[string]bool)
@@ -84,6 +111,7 @@ func initFromCmdLine() *singularity.AppConfig {
 	appConfig.WsHTTPProxyServerPort = *WsHttpProxyServerPort
 	appConfig.EnableLinuxTProxySupport = *enableLinuxTProxySupport
 	appConfig.IgnoreDNSRequestFrom = myArrIpAddressesFlags
+	appConfig.OriginTrialTokens = originTrialTokens
 
 	return &appConfig
 }
@@ -106,6 +134,7 @@ func main() {
 		Wscss:                   wscss,
 		WsHTTPProxyServerPort:   appConfig.WsHTTPProxyServerPort,
 		AuthToken:               authToken,
+		OriginTrialTokens:       appConfig.OriginTrialTokens,
 	}
 
 	// Attach DNS handler function
@@ -127,7 +156,11 @@ func main() {
 
 	for _, port := range appConfig.HTTPServerPorts {
 		// Start HTTP Servers
-		httpServer := singularity.NewHTTPServer(port, hss, dcss, wscss)
+		token := ""
+		if t, ok := appConfig.OriginTrialTokens[port]; ok {
+			token = t
+		}
+		httpServer := singularity.NewHTTPServer(port, hss, dcss, token, wscss)
 		httpServerErr := singularity.StartHTTPServer(httpServer, hss, false, appConfig.EnableLinuxTProxySupport)
 
 		if httpServerErr != nil {

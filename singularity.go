@@ -57,6 +57,8 @@ type AppConfig struct {
 	WsHTTPProxyServerPort        int
 	EnableLinuxTProxySupport     bool
 	IgnoreDNSRequestFrom         []net.IP
+
+	OriginTrialTokens map[int]string
 }
 
 // GenerateRandomString returns a secure random hexstring, 20 chars long
@@ -493,7 +495,8 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 // DefaultHeadersHandler is a HTTP handler that adds default headers to responses
 // for all routes
 type DefaultHeadersHandler struct {
-	NextHandler http.Handler
+	NextHandler      http.Handler
+	OriginTrialToken string // empty => do not send header
 }
 
 // HTTPClientInfoHandler is a HTTP handler to provide HTTP client information
@@ -524,6 +527,8 @@ type HTTPServerStoreHandler struct {
 	Wscss                 *WebsocketClientStateStore
 	WsHTTPProxyServerPort int
 	AuthToken             string
+
+	OriginTrialTokens map[int]string
 }
 
 // IPTablesHandler is a HTTP handler that adds/removes iptables rules
@@ -551,6 +556,11 @@ func (d *DefaultHeadersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Expires", "0")                                         // Proxies
 	w.Header().Set("X-DNS-Prefetch-Control", "off")                        //Chrome
 	w.Header().Set("X-Singularity-Of-Origin", "t")
+
+	if d.OriginTrialToken != "" {
+		w.Header().Set("Origin-Trial", d.OriginTrialToken)
+	}
+
 	d.NextHandler.ServeHTTP(w, r)
 }
 
@@ -727,7 +737,14 @@ func (hss *HTTPServerStoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		}
 		hss.Unlock()
 
-		httpServer := NewHTTPServer(port, hss, hss.Dcss, hss.Wscss)
+		token := ""
+		if hss.OriginTrialTokens != nil {
+			if t, ok := hss.OriginTrialTokens[port]; ok {
+				token = t
+			}
+		}
+
+		httpServer := NewHTTPServer(port, hss, hss.Dcss, token, hss.Wscss)
 		httpServerErr := StartHTTPServer(httpServer, hss, true, false)
 
 		if httpServerErr != nil {
@@ -833,12 +850,12 @@ func (h *DelayDOMLoadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 // NewHTTPServer configures a HTTP server
-func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateStore,
+func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateStore, originTrialToken string,
 	wscss *WebsocketClientStateStore) *http.Server {
-	d := &DefaultHeadersHandler{NextHandler: http.FileServer(http.Dir("./html"))}
+	d := &DefaultHeadersHandler{NextHandler: http.FileServer(http.Dir("./html")), OriginTrialToken: originTrialToken}
 	hcih := &HTTPClientInfoHandler{}
 	pth := &PayloadTemplateHandler{}
-	dpth := &DefaultHeadersHandler{NextHandler: pth}
+	dpth := &DefaultHeadersHandler{NextHandler: pth, OriginTrialToken: originTrialToken}
 	ipth := &IPTablesHandler{}
 	delayDOMLoadHandler := &DelayDOMLoadHandler{}
 	//websocketHandler := &WebsocketHandler{dcss: dcss, wscss: wscss}
