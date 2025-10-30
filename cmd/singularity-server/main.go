@@ -48,15 +48,12 @@ func (a *ArrIpAddressFlags) Set(value string) error {
 type portTokenFlags map[int]string
 
 func (p *portTokenFlags) String() string { return fmt.Sprintf("%T", *p) }
+
 func (p *portTokenFlags) Set(value string) error {
-	// Accept "8080=TOKEN" or "8080:TOKEN"
-	sep := "="
-	if i := strings.Index(value, ":"); i != -1 && strings.Index(value, "=") == -1 {
-		sep = ":"
-	}
-	parts := strings.SplitN(value, sep, 2)
+	// use ":" as the delimiter
+	parts := strings.SplitN(value, ":", 2)
 	if len(parts) != 2 {
-		return fmt.Errorf("expected PORT=TOKEN, got %q", value)
+		return fmt.Errorf("expected PORT:TOKEN, got %q", value)
 	}
 	port, err := strconv.Atoi(parts[0])
 	if err != nil {
@@ -89,7 +86,7 @@ func initFromCmdLine() *singularity.AppConfig {
 	flag.Var(&myArrayPortFlags, "HTTPServerPort", "Specify the attacker HTTP Server port that will serve HTML/JavaScript files. Repeat this flag to listen on more than one HTTP port.")
 	flag.Var(&myArrIpAddressesFlags, "ignoreDNSRequestFrom", "Specify a source IP address to ignore DNS requests from. Repeat this flag to ignore more than one IP address. Useful for reliable DNS rebinding sessions, where third-parties may repeat DNS requests from targets.")
 	var dnsServerBindAddr = flag.String("DNSServerBindAddr", "0.0.0.0", "Specify the IP address the DNS server will bind to, defaults to 0.0.0.0")
-	flag.Var(&originTrialTokens, "OriginTrialToken", "Specify an Origin-Trial token for a given HTTP port as PORT=TOKEN (repeatable). Example: -OriginTrialToken 8080=TOKEN1 -OriginTrialToken 8000=TOKEN2")
+	flag.Var(&originTrialTokens, "OriginTrialToken", "Specify an Origin-Trial token for a given HTTP port as PORT:TOKEN (repeatable). Example: -OriginTrialToken 8080:TOKEN1 -OriginTrialToken 8000:TOKEN2")
 
 	flag.Parse()
 	flagset := make(map[string]bool)
