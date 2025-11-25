@@ -2,7 +2,7 @@
 
 Recent updates:
 
-- **NEW (2025-11-25):**: Chrome release 142 added Local Network Access (LNA), which prevents DNS rebinding attack techniques implemented in Singularity. Singularity of Origin's [LNA-from-Non-Secure-Contexts](https://github.com/nccgroup/singularity/tree/Experimental/LNA-from-Non-Secure-Contexts) branch implements support for [Trial for Local Network Access from Non-Secure Contexts](https://developer.chrome.com/origintrials/#/view_trial/3826370833404657665). This temporarily allows access to resources on local networks from non-secure contexts, thus letting you experiment with DNS rebinding attacks a bit longer (until May 18, 2026) when using Chrome.
+- **NEW (2025-11-25)**: Chrome release 142 added Local Network Access (LNA), which prevents DNS rebinding attack techniques implemented in Singularity. Singularity of Origin's [LNA-from-Non-Secure-Contexts](https://github.com/nccgroup/singularity/tree/Experimental/LNA-from-Non-Secure-Contexts) branch implements support for [Trial for Local Network Access from Non-Secure Contexts](https://developer.chrome.com/origintrials/#/view_trial/3826370833404657665). This temporarily allows access to resources on local networks from non-secure contexts, thus letting you experiment with DNS rebinding attacks a bit longer (until May 18, 2026) when using Chrome.
 
 - NEW (2025-05-19): Our demo site, [rebind.it](http://rebind.it:8080/singularity.html), has been upgraded to support IPv6 ([commit 3c5ee9a](https://github.com/nccgroup/singularity/commit/3c5ee9a8813879fba3dae3bccb0a9e749aa5ca37)). This is a breaking change for manual queries (outside of Singularity Manager UI) because the DNS query format has been modified. Please refer to [How to Create Manual DNS Requests to Singularity of Origin](https://github.com/nccgroup/singularity/wiki/How-to-Create-Manual-DNS-Requests-to-Singularity%3F) for detailed instructions. Additionally, we periodically add new attack payloads; be sure to check them out.
 
@@ -112,6 +112,7 @@ Singularity supports the following attack payloads:
   [Docker API](https://docs.docker.com/engine/api/latest/)
   and displays the `/etc/shadow` file of the Docker host.
 * **Ollama Llama2 Exfil** (`ollama-exfil.js`): Exfiltrate files from hosts running Ollama, an open-source system for running and managing large language models (LLMs). See blog [post](https://www.nccgroup.com/us/research-blog/technical-advisory-ollama-dns-rebinding-attack-cve-2024-28224/).
+
 
 
 
