@@ -2,9 +2,11 @@
 
 Recent updates:
 
-- **NEW (2025-05-19):** Our demo site, [rebind.it](http://rebind.it:8080/singularity.html), has been upgraded to support IPv6 ([commit 3c5ee9a](https://github.com/nccgroup/singularity/commit/3c5ee9a8813879fba3dae3bccb0a9e749aa5ca37)). This is a breaking change for manual queries (outside of Singularity Manager UI) because the DNS query format has been modified. Please refer to [How to Create Manual DNS Requests to Singularity of Origin](https://github.com/nccgroup/singularity/wiki/How-to-Create-Manual-DNS-Requests-to-Singularity%3F) for detailed instructions. Additionally, we periodically add new attack payloads; be sure to check them out.
+- **NEW (2025-11-25):**: Chrome release 142 added Local Network Access (LNA), which prevents DNS rebinding attack techniques implemented in Singularity. Singularity of Origin's [LNA-from-Non-Secure-Contexts](https://github.com/nccgroup/singularity/tree/Experimental/LNA-from-Non-Secure-Contexts) branch implements support for [Trial for Local Network Access from Non-Secure Contexts](https://developer.chrome.com/origintrials/#/view_trial/3826370833404657665). This temporarily allows access to resources on local networks from non-secure contexts, thus letting you experiment with DNS rebinding attacks a bit longer (until May 18, 2026) when using Chrome.
 
-- NEW (2023-04-27): Check out our blog post documenting the [state of DNS rebinding for April 2023](https://www.nccgroup.com/us/research-blog/state-of-dns-rebinding-in-2023/). We describe Local Network Access, a new draft W3C specification currently implemented in some browsers that aims to prevent DNS rebinding, and show two ways to bypass these restrictions. We also discuss the effects of WebRTC IP address leak mitigation, and DNS Bit 0x20 on DNS rebinding attacks.
+- NEW (2025-05-19): Our demo site, [rebind.it](http://rebind.it:8080/singularity.html), has been upgraded to support IPv6 ([commit 3c5ee9a](https://github.com/nccgroup/singularity/commit/3c5ee9a8813879fba3dae3bccb0a9e749aa5ca37)). This is a breaking change for manual queries (outside of Singularity Manager UI) because the DNS query format has been modified. Please refer to [How to Create Manual DNS Requests to Singularity of Origin](https://github.com/nccgroup/singularity/wiki/How-to-Create-Manual-DNS-Requests-to-Singularity%3F) for detailed instructions. Additionally, we periodically add new attack payloads; be sure to check them out.
+
+- (2023-04-27) Check out our blog post documenting the [state of DNS rebinding for April 2023](https://www.nccgroup.com/us/research-blog/state-of-dns-rebinding-in-2023/). We describe Local Network Access, a new draft W3C specification currently implemented in some browsers that aims to prevent DNS rebinding, and show two ways to bypass these restrictions. We also discuss the effects of WebRTC IP address leak mitigation, and DNS Bit 0x20 on DNS rebinding attacks.
 
 - (2020-03-30) New blog post investigating the [impact of DoH on DNS rebinding attacks](https://www.nccgroup.com/us/research-blog/impact-of-dns-over-https-doh-on-dns-rebinding-attacks/). TL;DR: DoH (DNS over HTTPS) has no effect on rebinding attacks and protections advertised by providers can be bypassed.
 
@@ -110,6 +112,7 @@ Singularity supports the following attack payloads:
   [Docker API](https://docs.docker.com/engine/api/latest/)
   and displays the `/etc/shadow` file of the Docker host.
 * **Ollama Llama2 Exfil** (`ollama-exfil.js`): Exfiltrate files from hosts running Ollama, an open-source system for running and managing large language models (LLMs). See blog [post](https://www.nccgroup.com/us/research-blog/technical-advisory-ollama-dns-rebinding-attack-cve-2024-28224/).
+
 
 
 
