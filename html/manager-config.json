@@ -54,5 +54,9 @@
     }, {
         "name": "H2 Log4Shell RCE",
         "ports": [8082]
+    },
+    {
+        "name": "Ray Jobs RCE",
+        "ports": [8265]
     }]
 }
