@@ -83,7 +83,7 @@ const RayRce = () => {
             return response.text()
         })
         .then(function (d) {
-            if (d.includes("You need to enable JavaScript")) {
+            if (d.includes("Ray Dashboard")) {
                 return true;
             } else {
                 return false;
