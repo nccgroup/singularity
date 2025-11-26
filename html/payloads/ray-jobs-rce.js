@@ -49,7 +49,7 @@ const RayRce = () => {
             "job_id": null,
             "metadata": {
                 "job_submission_id": timestamp.toString(),
-                "source": "nccgroup/singluarity"
+                "source": "nccgroup/singularity"
             }
         };
         
