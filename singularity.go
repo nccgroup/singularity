@@ -247,30 +247,22 @@ func DNSRebindFromQueryRandom(session string, dcss *DNSClientStateStore, q dns.Q
 // It extracts the two hosts in the DNS query string
 // then returns the extracted hosts in a round robin fashion
 func DNSRebindFromQueryRoundRobin(session string, dcss *DNSClientStateStore, q dns.Question) []string {
-	dcss.RLock()
-	answers := []string{dcss.Sessions[session].ResponseIPAddr}
-	ResponseIPAddr := dcss.Sessions[session].ResponseIPAddr
-	ResponseReboundIPAddr := dcss.Sessions[session].ResponseReboundIPAddr
-	LastResponseReboundIPAddr := dcss.Sessions[session].LastResponseReboundIPAddr
-	dcss.RUnlock()
-
-	log.Printf("DNS: in DNSRebindFromQueryRoundRobin\n")
-
-	hosts := []string{"", ResponseIPAddr, ResponseReboundIPAddr}
-	switch LastResponseReboundIPAddr {
-	case 0:
-		LastResponseReboundIPAddr = 1
-	case 1:
-		LastResponseReboundIPAddr = 2
-	case 2:
-		LastResponseReboundIPAddr = 1
-	}
-
 	dcss.Lock()
-	dcss.Sessions[session].LastResponseReboundIPAddr = LastResponseReboundIPAddr
+	s := dcss.Sessions[session]
+	answers := []string{s.ResponseIPAddr}
+	hosts := []string{"", s.ResponseIPAddr, s.ResponseReboundIPAddr}
+	switch s.LastResponseReboundIPAddr {
+	case 0:
+		s.LastResponseReboundIPAddr = 1
+	case 1:
+		s.LastResponseReboundIPAddr = 2
+	case 2:
+		s.LastResponseReboundIPAddr = 1
+	}
+	answers[0] = hosts[s.LastResponseReboundIPAddr]
 	dcss.Unlock()
 
-	answers[0] = hosts[LastResponseReboundIPAddr]
+	log.Printf("DNS: in DNSRebindFromQueryRoundRobin\n")
 
 	return answers
 }
@@ -469,8 +461,10 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 					}
 
 					dcss.Lock()
-					dcss.Sessions[name.Session].CurrentQueryTime = now
-					dcss.Sessions[name.Session].LastQueryTime = now
+					if s, exists := dcss.Sessions[name.Session]; exists {
+						s.CurrentQueryTime = now
+						s.LastQueryTime = now
+					}
 					dcss.Unlock()
 
 					for _, resp := range response {
@@ -560,18 +554,17 @@ func (hcih *HTTPClientInfoHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	emptyResponse, _ := json.Marshal(hcih)
-	splitted := strings.Split(r.RemoteAddr, ":")
-	hcih.IPAddress = splitted[0]
-	hcih.Port = splitted[1]
-	clientInfoResponse, _ := json.Marshal(hcih)
-
 	switch r.Method {
 	case "GET":
+		splitted := strings.Split(r.RemoteAddr, ":")
+		response := HTTPClientInfoHandler{
+			IPAddress: splitted[0],
+			Port:      splitted[1],
+		}
+		clientInfoResponse, _ := json.Marshal(response)
 		fmt.Fprintf(w, "%v", string(clientInfoResponse))
 	default:
-		http.Error(w, string(emptyResponse), 400)
-		return
+		http.Error(w, "{}", 400)
 	}
 }
 
@@ -862,29 +855,25 @@ func NewHTTPServer(port int, hss *HTTPServerStoreHandler, dcss *DNSClientStateSt
 
 		name, err := NewDNSQuery(req.Host)
 		if err == nil {
+			var shouldFirewall bool
 
-			dcss.RLock()
-			_, keyExists := dcss.Sessions[name.Session]
-			log.Printf("HTTP: matching DNS session exists: %v\n", keyExists)
-			dcss.RUnlock()
-
-			if keyExists == true {
-				dcss.RLock()
-				elapsed := time.Now().Sub(dcss.Sessions[name.Session].FirstQueryTime)
-				dcss.RUnlock()
-
-				if name.DNSRebindingStrategy == "ma" {
-					if elapsed > (time.Second * time.Duration(3)) {
-						log.Printf("HTTP: attempting Multiple A records rebinding for: %v", name)
-						dcss.Lock()
-						dcss.Sessions[name.Session].FirewalledOnce = true
-						dcss.Unlock()
-						ipth.ServeHTTP(w, req)
-						return
-					}
+			dcss.Lock()
+			session, exists := dcss.Sessions[name.Session]
+			log.Printf("HTTP: matching DNS session exists: %v\n", exists)
+			if exists && name.DNSRebindingStrategy == "ma" {
+				elapsed := time.Now().Sub(session.FirstQueryTime)
+				if elapsed > (time.Second * time.Duration(3)) {
+					session.FirewalledOnce = true
+					shouldFirewall = true
 				}
 			}
+			dcss.Unlock()
 
+			if shouldFirewall {
+				log.Printf("HTTP: attempting Multiple A records rebinding for: %v", name)
+				ipth.ServeHTTP(w, req)
+				return
+			}
 		}
 		d.ServeHTTP(w, req)
 	})
