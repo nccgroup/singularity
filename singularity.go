@@ -202,7 +202,12 @@ func NewDNSQueryFromOrigin(origin string) (*DNSQuery, error) {
 // that always returns the first host in DNS query
 func dnsRebindFirst(session string, dcss *DNSClientStateStore, q dns.Question) []string {
 	dcss.RLock()
-	answers := []string{dcss.Sessions[session].ResponseIPAddr}
+	s := dcss.Sessions[session]
+	if s == nil {
+		dcss.RUnlock()
+		return nil
+	}
+	answers := []string{s.ResponseIPAddr}
 	dcss.RUnlock()
 	return answers
 }
@@ -213,14 +218,19 @@ func dnsRebindFirst(session string, dcss *DNSClientStateStore, q dns.Question) [
 // then the second host in all subsequent queries for a period of time timeout.
 func DNSRebindFromQueryFirstThenSecond(session string, dcss *DNSClientStateStore, q dns.Question) []string {
 	dcss.RLock()
-	answers := []string{dcss.Sessions[session].ResponseIPAddr}
-	elapsed := dcss.Sessions[session].CurrentQueryTime.Sub(dcss.Sessions[session].LastQueryTime)
-	timeOut := dcss.Sessions[session].ResponseReboundIPAddrtimeOut
+	s := dcss.Sessions[session]
+	if s == nil {
+		dcss.RUnlock()
+		return nil
+	}
+	answers := []string{s.ResponseIPAddr}
+	elapsed := s.CurrentQueryTime.Sub(s.LastQueryTime)
+	timeOut := s.ResponseReboundIPAddrtimeOut
 
 	log.Printf("DNS: in DNSRebindFromQueryFirstThenSecond\n")
 
 	if elapsed < (time.Second * time.Duration(timeOut)) {
-		answers[0] = dcss.Sessions[session].ResponseReboundIPAddr
+		answers[0] = s.ResponseReboundIPAddr
 	}
 
 	dcss.RUnlock()
@@ -232,8 +242,13 @@ func DNSRebindFromQueryFirstThenSecond(session string, dcss *DNSClientStateStore
 // then returns either extracted hosts randomly
 func DNSRebindFromQueryRandom(session string, dcss *DNSClientStateStore, q dns.Question) []string {
 	dcss.RLock()
-	answers := []string{dcss.Sessions[session].ResponseIPAddr}
-	hosts := []string{dcss.Sessions[session].ResponseIPAddr, dcss.Sessions[session].ResponseReboundIPAddr}
+	s := dcss.Sessions[session]
+	if s == nil {
+		dcss.RUnlock()
+		return nil
+	}
+	answers := []string{s.ResponseIPAddr}
+	hosts := []string{s.ResponseIPAddr, s.ResponseReboundIPAddr}
 	dcss.RUnlock()
 
 	log.Printf("DNS: in DNSRebindFromQueryRandom\n")
@@ -249,6 +264,10 @@ func DNSRebindFromQueryRandom(session string, dcss *DNSClientStateStore, q dns.Q
 func DNSRebindFromQueryRoundRobin(session string, dcss *DNSClientStateStore, q dns.Question) []string {
 	dcss.Lock()
 	s := dcss.Sessions[session]
+	if s == nil {
+		dcss.Unlock()
+		return nil
+	}
 	answers := []string{s.ResponseIPAddr}
 	hosts := []string{"", s.ResponseIPAddr, s.ResponseReboundIPAddr}
 	switch s.LastResponseReboundIPAddr {
@@ -273,11 +292,16 @@ func DNSRebindFromQueryRoundRobin(session string, dcss *DNSClientStateStore, q d
 func DNSRebindFromQueryMultiA(session string, dcss *DNSClientStateStore, q dns.Question) []string {
 	var answers []string
 	dcss.RLock()
-	if dcss.Sessions[session].FirewalledOnce == true {
+	s := dcss.Sessions[session]
+	if s == nil {
+		dcss.RUnlock()
+		return nil
+	}
+	if s.FirewalledOnce == true {
 		// we try to prevent browsers like Chrome for reverting back to first IP address
-		answers = []string{dcss.Sessions[session].ResponseReboundIPAddr}
+		answers = []string{s.ResponseReboundIPAddr}
 	} else {
-		answers = []string{dcss.Sessions[session].ResponseIPAddr, dcss.Sessions[session].ResponseReboundIPAddr}
+		answers = []string{s.ResponseIPAddr, s.ResponseReboundIPAddr}
 	}
 	dcss.RUnlock()
 	log.Printf("DNS: in DNSRebindFromQueryMultiA\n")
@@ -397,6 +421,12 @@ func MakeRebindDNSHandler(appConfig *AppConfig, dcss *DNSClientStateStore) dns.H
 					dcss.Unlock()
 
 					answers := rebindingFn(name.Session, dcss, q)
+
+					if len(answers) == 0 {
+						log.Printf("DNS: session expired for %v, sending empty response\n", w.RemoteAddr().String())
+						w.WriteMsg(m)
+						return
+					}
 
 					response := []string{}
 
