@@ -586,10 +586,14 @@ func (hcih *HTTPClientInfoHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 
 	switch r.Method {
 	case "GET":
-		splitted := strings.Split(r.RemoteAddr, ":")
+		ip, port, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			http.Error(w, "{}", 400)
+			return
+		}
 		response := HTTPClientInfoHandler{
-			IPAddress: splitted[0],
-			Port:      splitted[1],
+			IPAddress: ip,
+			Port:      port,
 		}
 		clientInfoResponse, _ := json.Marshal(response)
 		fmt.Fprintf(w, "%v", string(clientInfoResponse))
