@@ -38,6 +38,15 @@ Detailed documentation is on the [wiki pages](https://github.com/nccgroup/singul
 ### Hook and Control a Vulnerable Application on Localhost or Other Hosts
 ![Fetch an application home page](./screenshots/hookandcontrol.png)
 
+### MCP Inspector - Exploit Model Context Protocol Servers
+**NEW**: Dedicated interface for testing Model Context Protocol (MCP) servers for DNS rebinding vulnerabilities. Features include:
+- Auto-detection of MCP endpoints and transport types (SSE/HTTP)
+- Interactive tool execution with custom arguments
+- Capability discovery and resource enumeration
+- Real-time logging and impact demonstration
+
+Access at: `http://[your-server]/mcp-inspector.html`
+
 ### Automate the Scan and Compromise of All Vulnerables Applications
 ![Fetch an application home page](./screenshots/autoattack.png)
 
@@ -112,4 +121,8 @@ Singularity supports the following attack payloads:
   [Docker API](https://docs.docker.com/engine/api/latest/)
   and displays the `/etc/shadow` file of the Docker host.
 * **Ollama Llama2 Exfil** (`ollama-exfil.js`): Exfiltrate files from hosts running Ollama, an open-source system for running and managing large language models (LLMs). See blog [post](https://www.nccgroup.com/us/research-blog/technical-advisory-ollama-dns-rebinding-attack-cve-2024-28224/).
+* **MCP Exploit Runner** (`mcp-exploit-runner.js`): Interactive payload for exploiting Model Context Protocol (MCP) servers. Auto-detects endpoints and transports (SSE/HTTP), discovers capabilities, and executes tools. Use with `mcp-inspector.html` for a full-featured MCP exploitation interface.
+* **MCP SSE** (`mcp-sse.js`): Legacy payload specifically for MCP servers using Server-Sent Events (SSE) transport. Superseded by `mcp-exploit-runner.js` but maintained for standalone use.
+* **MCP Streamable HTTP** (`mcp-streamable-http.js`): Legacy payload specifically for MCP servers using HTTP (Streamable) transport. Superseded by `mcp-exploit-runner.js` but maintained for standalone use.
 * And more, check the payloads folder (`html/payloads`).
+
