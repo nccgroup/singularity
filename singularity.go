@@ -629,18 +629,18 @@ func (pth *PayloadTemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	<script>
 	{{ .JavaScriptCode }}
 
-	function attack(payload, headers, cookie, body, wsproxyport) {
+	function attack(payload, headers, cookie, body, wsproxyport, options) {
 		const titleEl = document.getElementById('title');
 		if (payload === 'automatic') {
 			(async function loop() {
 				for (let payload in Registry) {
 					console.log("Trying payload: " + payload + " for frame: " + window.location);
-					await Registry[payload].isService(headers, cookie, body)
+					await Registry[payload].isService(headers, cookie, body, options)
 						.then(response => {
 							if (response === true) {
 								titleEl.innerText = payload;
 								console.log("Payload: " + payload + " has identified a service for frame: " + window.location);
-								Registry[payload].attack(headers, cookie, body, wsproxyport);
+								Registry[payload].attack(headers, cookie, body, wsproxyport, options);
 								return;
 							} else {
 								console.log("Payload: " + payload + " has rejected a service for frame: " + window.location);
@@ -650,7 +650,7 @@ func (pth *PayloadTemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 			})();
 		} else {
 			titleEl.innerText = payload;
-			Registry[payload].attack(headers, cookie, body, wsproxyport);
+			Registry[payload].attack(headers, cookie, body, wsproxyport, options);
 		}
 	}
 	</script></head>

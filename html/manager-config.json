@@ -11,7 +11,18 @@
     "indexToken": "thisismytesttoken",
     "attackPayloads": [{
         "name": "Simple Fetch Get",
-        "ports": []
+        "ports": [],
+        "configSchema": {
+            "type": "object",
+            "properties": {
+                "logResponse": {
+                    "type": "boolean",
+                    "title": "Log Response",
+                    "description": "Log the response to console",
+                    "default": true
+                }
+            }
+        }
     }, {
         "name": "Ollama Llama2 Exfil",
         "ports": [11434]
@@ -32,7 +43,24 @@
         "ports": [4000]
     }, {
         "name": "Rails Console RCE",
-        "ports": [3000]
+        "ports": [3000],
+        "configSchema": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "title": "Ruby Command",
+                    "description": "Ruby command to execute in Rails console",
+                    "default": "puts Rails.env"
+                },
+                "autoExecute": {
+                    "type": "boolean",
+                    "title": "Auto Execute",
+                    "description": "Automatically execute the command",
+                    "default": false
+                }
+            }
+        }
     }, {
         "name": "AWS Metadata Exfil",
         "ports": [80]

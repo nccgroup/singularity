@@ -7,7 +7,9 @@ were working from the target environment.
 const HookAndControl = () => {
 
     // Invoked after DNS rebinding has been performed
-    function attack(headers, cookie, body, wsProxyPort) {
+    function attack(headers, cookie, body, wsProxyPort, options) {
+        options = options || { headers: {}, config: {} };
+
         if (headers !== null) {
             console.log(`Origin: ${window.location} headers: ${httpHeaderstoText(headers)}`);
         };
@@ -24,7 +26,7 @@ const HookAndControl = () => {
 
     // Invoked to determine whether the rebinded service
     // is the one targeted by this payload. Must return true or false.
-    async function isService(headers, cookie, body) {
+    async function isService(headers, cookie, body, options) {
         return false;
     }
 

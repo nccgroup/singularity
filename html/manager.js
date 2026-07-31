@@ -3,6 +3,7 @@
 const Payload = () => {
     let name = null;
     let ports = [];
+    let configSchema = null;
     return {
         getName() {
             return name;
@@ -10,9 +11,13 @@ const Payload = () => {
         getPorts() {
             return ports;
         },
-        init(n, p) {
+        getConfigSchema() {
+            return configSchema;
+        },
+        init(n, p, cs) {
             name = n;
             ports = p;
+            configSchema = cs || null;
         }
     }
 }
@@ -35,6 +40,8 @@ const Configuration = () => {
     let rebindingStrategy = null;
     let attackMethod = null; //'iframe', or 'fetch
     let flushDns = null;
+    let customHeaders = null;
+    let payloadConfig = null;
 
     let rebindingSuccessFn = null;
 
@@ -95,7 +102,7 @@ const Configuration = () => {
                     let config = JSON.parse(d);
                     for (let p of config.attackPayloads) {
                         let myConfigPayload = Payload();
-                        myConfigPayload.init(p.name, p.ports);
+                        myConfigPayload.init(p.name, p.ports, p.configSchema);
                         attackPayloads.push(myConfigPayload);
                     }
                     attackHostDomain = config.attackHostDomain;
@@ -167,6 +174,18 @@ const Configuration = () => {
         },
         setAttackMethod(attackMethodName) {
             attackMethod = attackMethodName;
+        },
+        getCustomHeaders() {
+            return customHeaders;
+        },
+        setCustomHeaders(headers) {
+            customHeaders = headers;
+        },
+        getPayloadConfig() {
+            return payloadConfig;
+        },
+        setPayloadConfig(config) {
+            payloadConfig = config;
         },
         setManually(configObject) {
             attackHostIPAddress = configObject.attackHostIPAddress;
@@ -365,7 +384,170 @@ const App = () => {
         document.getElementById(configuration.getRebindingStrategy()).selected = true;
         document.getElementById('attackmethod').value = configuration.getAttackMethod();
         document.getElementById('flushdns').checked = configuration.getFlushDns();
+
+        // Setup payload selection change handler
+        payloadsElement.addEventListener('change', function() {
+            updatePayloadConfigUI(payloadsElement.value);
+        });
     };
+
+    // Generate dynamic UI based on selected payload's config schema
+    function updatePayloadConfigUI(payloadName) {
+        const payloadConfigSection = document.getElementById('payloadConfigSection');
+        const payloadConfigFields = document.getElementById('payloadConfigFields');
+
+        // Clear existing fields
+        payloadConfigFields.innerHTML = '';
+
+        // Find the selected payload
+        const payload = configuration.getAttackPayloads().find(p => p.getName() === payloadName);
+
+        if (!payload || !payload.getConfigSchema()) {
+            payloadConfigSection.className = 'd-none';
+            return;
+        }
+
+        const schema = payload.getConfigSchema();
+
+        if (!schema.properties || Object.keys(schema.properties).length === 0) {
+            payloadConfigSection.className = 'd-none';
+            return;
+        }
+
+        // Show the section
+        payloadConfigSection.className = 'd-block';
+
+        // Generate form fields based on schema
+        for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
+            const fieldGroup = document.createElement('div');
+            fieldGroup.className = 'form-group row mb-2';
+
+            const labelCol = document.createElement('div');
+            labelCol.className = 'col-4';
+            const label = document.createElement('label');
+            label.setAttribute('for', `payloadConfig_${fieldName}`);
+            label.textContent = fieldSchema.title || fieldName;
+            labelCol.appendChild(label);
+
+            const inputCol = document.createElement('div');
+            inputCol.className = 'col-4';
+
+            let inputElement;
+
+            switch (fieldSchema.type) {
+                case 'boolean':
+                    inputElement = document.createElement('input');
+                    inputElement.type = 'checkbox';
+                    inputElement.checked = fieldSchema.default || false;
+                    inputElement.className = 'form-check-input';
+                    break;
+
+                case 'number':
+                case 'integer':
+                    inputElement = document.createElement('input');
+                    inputElement.type = 'number';
+                    inputElement.value = fieldSchema.default || 0;
+                    inputElement.className = 'form-control';
+                    if (fieldSchema.minimum !== undefined) {
+                        inputElement.min = fieldSchema.minimum;
+                    }
+                    if (fieldSchema.maximum !== undefined) {
+                        inputElement.max = fieldSchema.maximum;
+                    }
+                    break;
+
+                case 'string':
+                    if (fieldSchema.enum) {
+                        inputElement = document.createElement('select');
+                        inputElement.className = 'form-control';
+                        for (const enumValue of fieldSchema.enum) {
+                            const option = document.createElement('option');
+                            option.value = enumValue;
+                            option.text = enumValue;
+                            if (enumValue === fieldSchema.default) {
+                                option.selected = true;
+                            }
+                            inputElement.appendChild(option);
+                        }
+                    } else {
+                        inputElement = document.createElement('input');
+                        inputElement.type = 'text';
+                        inputElement.value = fieldSchema.default || '';
+                        inputElement.className = 'form-control';
+                        inputElement.spellcheck = false;
+                    }
+                    break;
+
+                default:
+                    inputElement = document.createElement('input');
+                    inputElement.type = 'text';
+                    inputElement.value = fieldSchema.default || '';
+                    inputElement.className = 'form-control';
+            }
+
+            inputElement.id = `payloadConfig_${fieldName}`;
+            inputElement.setAttribute('data-field-name', fieldName);
+            inputElement.setAttribute('data-field-type', fieldSchema.type);
+            inputCol.appendChild(inputElement);
+
+            const helpCol = document.createElement('div');
+            helpCol.className = 'col-4';
+            if (fieldSchema.description) {
+                const helpText = document.createElement('small');
+                helpText.className = 'form-text text-muted';
+                helpText.textContent = fieldSchema.description;
+                helpCol.appendChild(helpText);
+            }
+
+            fieldGroup.appendChild(labelCol);
+            fieldGroup.appendChild(inputCol);
+            fieldGroup.appendChild(helpCol);
+            payloadConfigFields.appendChild(fieldGroup);
+        }
+    }
+
+    // Collect payload config from UI
+    function collectPayloadConfig() {
+        const payloadConfigFields = document.getElementById('payloadConfigFields');
+        const inputs = payloadConfigFields.querySelectorAll('input, select, textarea');
+        const config = {};
+
+        for (const input of inputs) {
+            const fieldName = input.getAttribute('data-field-name');
+            const fieldType = input.getAttribute('data-field-type');
+
+            if (!fieldName) continue;
+
+            switch (fieldType) {
+                case 'boolean':
+                    config[fieldName] = input.checked;
+                    break;
+                case 'number':
+                case 'integer':
+                    config[fieldName] = parseFloat(input.value);
+                    break;
+                default:
+                    config[fieldName] = input.value;
+            }
+        }
+
+        return config;
+    }
+
+    // Collect custom headers from UI
+    function collectCustomHeaders() {
+        const customHeadersInput = document.getElementById('customHeaders');
+        if (!customHeadersInput || !customHeadersInput.value.trim()) {
+            return {};
+        }
+
+        try {
+            return JSON.parse(customHeadersInput.value);
+        } catch (e) {
+            console.error('Failed to parse custom headers:', e);
+            return {};
+        }
+    }
 
 
 // Helper functions to allow users inputting common IP addresses instead of hexstrings, and CNAMEs
@@ -636,6 +818,13 @@ function ipToHexOrOriginal(input) {
                     cmd: 'flushdns',
                     param: { hostname: window.location.hostname, flushDns: configuration.getFlushDns() }
                 }, "*");
+                msg.source.postMessage({
+                    cmd: 'options',
+                    param: {
+                        headers: configuration.getCustomHeaders() || {},
+                        config: configuration.getPayloadConfig() || {}
+                    }
+                }, "*");
                 configuration.setFlushDns(false); // so it run only once in autoattack.
                 if (configuration.getAttackMethod() === 'fetch') {
                 msg.source.postMessage({
@@ -696,6 +885,12 @@ function ipToHexOrOriginal(input) {
             const UiAttackWsProxyPort = document.getElementById('wsproxyport').value;
             configuration.setWsProxyPort(UiAttackWsProxyPort);
 
+            // Collect options
+            const customHeaders = collectCustomHeaders();
+            configuration.setCustomHeaders(customHeaders);
+
+            const payloadConfig = collectPayloadConfig();
+            configuration.setPayloadConfig(payloadConfig);
 
             let fid = fm.addFrame(hosturl
                 .replace("%1", ipToHexOrOriginal(document.getElementById('attackhostipaddress').value))
