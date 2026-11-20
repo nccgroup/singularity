@@ -137,11 +137,12 @@
                         <select id="attackmethod" class="attackmethod-dropdown-content">
                             <option id="fetch" value="fetch" title="Default">Fetch API</option>
                             <option id="iframe" value="iframe" title="PNA Evasion">Inline Frame</option>
+                            <option id="popup" value="popup" title="LNA Evasion">Popup Window (top-level navigation)</option>
                         </select>
                     </div>
                     <div class="col-7">
                         <small id="attackMethodHelp" class="form-text text-muted">
-                            Fetch API works with most browsers, but is blocked by Chrome by most (but not all) target configurations. Inline Frame should work with most browsers, unless the target application does not allow rendering in an iframe.
+                            Fetch API works with most browsers, but is blocked by Chrome by most (but not all) target configurations. Inline Frame should work with most browsers, unless the target application does not allow rendering in an iframe. Popup Window uses a top-level navigation (exempt from Local Network Access restrictions in Chrome/Firefox) to a window on the rebinding hostname, then fetches from that window. Clicking "Start Attack" opens a small placeholder popup (one popup per user click is allowed) and returns focus here; the attack frame then navigates it, so keep that window open in the background. If the attack is started without a click, use the button shown in the attack frame instead.
                         </small>
                     </div>
                 </div>
